@@ -1,0 +1,179 @@
+@import "tailwindcss";
+
+/* Colores personalizados - Lavanda Dreams */
+:root {
+  --color-cream: #FEFBFF;
+  --color-peach: #FFD6E5;
+  --color-mint: #B8E1FF;
+  --color-lavender: #9D8DF1;
+  --color-warm-gray: #F0EDF8;
+  --color-text: #4A4A6A;
+  --color-rose: #FF8FB1;
+  --color-rose-light: #FFADC6;
+  --color-sage: #9D8DF1;
+  --color-coral: #FF4081;
+}
+
+body {
+  font-family: 'Nunito', system-ui, -apple-system, sans-serif;
+  background-color: var(--color-cream);
+  color: var(--color-text);
+  min-height: 100vh;
+  margin: 0;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Formas blob abstractas de fondo */
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  z-index: -1;
+  opacity: 0.7;
+  filter: blur(0);
+}
+
+body::before {
+  width: 250px;
+  height: 250px;
+  background: linear-gradient(135deg, var(--color-lavender), var(--color-rose));
+  top: -60px;
+  right: -60px;
+  border-radius: 60% 40% 70% 30% / 40% 50% 60% 50%;
+  animation: morph1 15s ease-in-out infinite;
+}
+
+body::after {
+  width: 230px;
+  height: 230px;
+  background: linear-gradient(135deg, var(--color-mint), var(--color-peach));
+  bottom: -60px;
+  left: -60px;
+  border-radius: 40% 60% 30% 70% / 50% 40% 60% 40%;
+  animation: morph2 18s ease-in-out infinite;
+}
+
+/* Burbujas decorativas adicionales */
+.bubbles-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.bubbles-bg::before,
+.bubbles-bg::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.08;
+  filter: blur(2px);
+}
+
+.bubbles-bg::before {
+  width: 80px;
+  height: 80px;
+  background: var(--color-lavender);
+  top: 35%;
+  left: 5%;
+  animation: float1 20s ease-in-out infinite;
+}
+
+.bubbles-bg::after {
+  width: 60px;
+  height: 60px;
+  background: var(--color-coral);
+  top: 55%;
+  right: 8%;
+  animation: float2 24s ease-in-out infinite;
+}
+
+@keyframes float1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(30px, -40px) scale(1.1); }
+  50% { transform: translate(-20px, -60px) scale(1.05); }
+  75% { transform: translate(15px, -30px) scale(0.95); }
+}
+
+@keyframes float2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(-25px, 30px) scale(0.9); }
+  50% { transform: translate(20px, 50px) scale(1.08); }
+  75% { transform: translate(-15px, 25px) scale(1); }
+}
+
+@keyframes morph1 {
+  0%, 100% {
+    border-radius: 60% 40% 70% 30% / 40% 50% 60% 50%;
+    transform: translate(0, 0) rotate(0deg);
+  }
+  33% {
+    border-radius: 40% 60% 50% 50% / 60% 30% 70% 40%;
+    transform: translate(10px, 15px) rotate(5deg);
+  }
+  66% {
+    border-radius: 50% 50% 40% 60% / 40% 60% 40% 60%;
+    transform: translate(-5px, 10px) rotate(-3deg);
+  }
+}
+
+@keyframes morph2 {
+  0%, 100% {
+    border-radius: 40% 60% 30% 70% / 50% 40% 60% 40%;
+    transform: translate(0, 0) rotate(0deg);
+  }
+  33% {
+    border-radius: 60% 40% 60% 40% / 40% 60% 40% 60%;
+    transform: translate(-15px, -10px) rotate(-5deg);
+  }
+  66% {
+    border-radius: 50% 50% 70% 30% / 60% 40% 50% 50%;
+    transform: translate(10px, -5px) rotate(3deg);
+  }
+}
+
+/* Animación de pulso suave para indicadores */
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.1); }
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+/* Animación de entrada */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.4s ease-out forwards;
+}
+
+/* Sombras orgánicas */
+.shadow-soft {
+  box-shadow: 0 4px 20px rgba(74, 74, 74, 0.08);
+}
+
+.shadow-soft-lg {
+  box-shadow: 0 8px 30px rgba(74, 74, 74, 0.12);
+}
+
+/* Ocultar scrollbar pero mantener funcionalidad */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

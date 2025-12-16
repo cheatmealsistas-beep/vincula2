@@ -1,0 +1,28 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="lavanda" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#B8A9FA"/>
+      <stop offset="100%" stop-color="#9D8DF1"/>
+    </linearGradient>
+    <linearGradient id="rosa" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF6B9D"/>
+      <stop offset="100%" stop-color="#FF4081"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Mitad izquierda (lavanda) - lobulo arriba izquierda, baja al centro -->
+  <path d="M35 32
+    C22 32, 18 48, 28 62
+    C38 76, 58 92, 60 95
+    L60 95
+    C60 70, 50 50, 35 32Z"
+    fill="url(#lavanda)"/>
+
+  <!-- Mitad derecha (rosa) - lobulo arriba derecha, baja al centro -->
+  <path d="M85 32
+    C98 32, 102 48, 92 62
+    C82 76, 62 92, 60 95
+    L60 95
+    C60 70, 70 50, 85 32Z"
+    fill="url(#rosa)"/>
+</svg>

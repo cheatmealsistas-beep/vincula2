@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import type { GameResponse } from '../lib/supabase';
 import { getRandomTimeCards, TIME_CARDS, type TimeCard } from '../data/timecards';
@@ -72,23 +72,29 @@ export function useTimeCards(
       setCards(newCards);
       setCurrentRound(1);
     } else {
-      // Player 2 espera
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const { data: roomRetry } = await supabase
-        .from('rooms')
-        .select('game_cards, game_round')
-        .eq('id', roomId)
-        .single();
+      // Jugador 2: esperar a que el jugador 1 cree los datos (polling con reintentos)
+      let retries = 0;
+      const maxRetries = 10;
+      while (retries < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const { data: roomRetry } = await supabase
+          .from('rooms')
+          .select('game_cards, game_round')
+          .eq('id', roomId)
+          .single();
 
-      if (roomRetry?.game_cards && Array.isArray(roomRetry.game_cards) && roomRetry.game_cards.length > 0) {
-        const firstItem = roomRetry.game_cards[0];
-        if (typeof firstItem === 'string') {
-          const saved = roomRetry.game_cards
-            .map((id: string) => TIME_CARDS.find(c => c.id === id))
-            .filter(Boolean) as TimeCard[];
-          setCards(saved);
+        if (roomRetry?.game_cards && Array.isArray(roomRetry.game_cards) && roomRetry.game_cards.length > 0) {
+          const firstItem = roomRetry.game_cards[0];
+          if (typeof firstItem === 'string') {
+            const saved = roomRetry.game_cards
+              .map((id: string) => TIME_CARDS.find(c => c.id === id))
+              .filter(Boolean) as TimeCard[];
+            setCards(saved);
+          }
+          setCurrentRound(roomRetry.game_round || 1);
+          break;
         }
-        setCurrentRound(roomRetry.game_round || 1);
+        retries++;
       }
     }
 
@@ -126,15 +132,24 @@ export function useTimeCards(
     setResponses(new Map());
   }, [roomId]);
 
-  // Cargar al entrar
+  // Ref para rastrear si ya tenemos cards (evita problemas de closure)
+  const cardsRef = useRef(cards);
+  cardsRef.current = cards;
+
+  // Cargar al entrar + polling continuo como fallback
   useEffect(() => {
     if (!roomId) return;
+
+    let isMounted = true;
+
     const load = async () => {
       const { data: room } = await supabase
         .from('rooms')
         .select('game_cards, game_round')
         .eq('id', roomId)
         .single();
+
+      if (!isMounted) return;
 
       if (room && room.game_cards && Array.isArray(room.game_cards) && room.game_cards.length > 0) {
         const firstItem = room.game_cards[0];
@@ -149,7 +164,19 @@ export function useTimeCards(
         setCurrentRound(room.game_round);
       }
     };
+
     load();
+
+    const pollInterval = setInterval(() => {
+      if (cardsRef.current.length === 0) {
+        load();
+      }
+    }, 1000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(pollInterval);
+    };
   }, [roomId]);
 
   // Suscripción a cambios en la sala
@@ -163,7 +190,7 @@ export function useTimeCards(
         schema: 'public',
         table: 'rooms',
         filter: `id=eq.${roomId}`,
-      }, (payload) => {
+      }, (payload: any) => {
         const room = payload.new as { game_round?: number; game_cards?: string[] };
         if (room.game_round && room.game_round !== currentRound) {
           setCurrentRound(room.game_round);
@@ -191,7 +218,7 @@ export function useTimeCards(
       const { data } = await supabase.from('game_responses').select().eq('room_id', roomId);
       if (data) {
         const newResponses = new Map<string, GameResponse>();
-        data.forEach(r => newResponses.set(`${r.round}-${r.player_number}`, r));
+        data.forEach((r: any) => newResponses.set(`${r.round}-${r.player_number}`, r));
         setResponses(newResponses);
       }
     };
@@ -204,7 +231,7 @@ export function useTimeCards(
         schema: 'public',
         table: 'game_responses',
         filter: `room_id=eq.${roomId}`,
-      }, (payload) => {
+      }, (payload: any) => {
         const response = payload.new as GameResponse;
         if (response) {
           setResponses(prev => {

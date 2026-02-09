@@ -1,14 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button, Card } from '../components';
+import { celebrateMatch } from '../utils/celebrations';
 import type { Card as CardType } from '../types';
-
-const GESTURES = [
-  { emoji: '💜', label: 'Te quiero' },
-  { emoji: '🫂', label: 'Te abrazo' },
-  { emoji: '👀', label: 'Te leo' },
-  { emoji: '🙏', label: 'Gracias' },
-  { emoji: '💭', label: 'Lo pienso' },
-];
 
 interface GameProps {
   cards: CardType[];
@@ -18,7 +11,6 @@ interface GameProps {
   partnerResponse?: string;
   bothRevealed: boolean;
   onSubmitResponse: (response: string) => void;
-  onSendGesture: (gesture: string) => void;
   onNextRound: () => void;
   onFinish: () => void;
 }
@@ -31,15 +23,20 @@ export function Game({
   partnerResponse,
   bothRevealed,
   onSubmitResponse,
-  onSendGesture,
   onNextRound,
   onFinish,
 }: GameProps) {
   const [response, setResponse] = useState('');
-  const [sentGesture, setSentGesture] = useState<string | null>(null);
   const currentCard = cards[currentRound - 1];
   const hasSubmitted = !!myResponse;
   const isLastRound = currentRound === totalRounds;
+
+  // Confeti cuando se revelan las respuestas
+  useEffect(() => {
+    if (bothRevealed) {
+      celebrateMatch();
+    }
+  }, [bothRevealed]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,21 +44,6 @@ export function Game({
       onSubmitResponse(response.trim());
       setResponse('');
     }
-  };
-
-  const handleGesture = (gesture: string) => {
-    setSentGesture(gesture);
-    onSendGesture(gesture);
-  };
-
-  const handleNext = () => {
-    setSentGesture(null);
-    onNextRound();
-  };
-
-  const handleFinish = () => {
-    setSentGesture(null);
-    onFinish();
   };
 
   const wordCount = response.trim().split(/\s+/).filter(Boolean).length;
@@ -127,7 +109,7 @@ export function Game({
             <div className="text-center py-8">
               <div className="w-6 h-6 border-3 border-[var(--color-text)] border-t-transparent rounded-full animate-spin mx-auto mb-4 opacity-40" />
               <p className="text-[var(--color-text)] opacity-70">
-                Esperando a que termine...
+                Tu pareja está pensando...
               </p>
             </div>
           ) : (
@@ -147,33 +129,6 @@ export function Game({
                 </p>
                 <p className="text-[var(--color-text)]">{partnerResponse}</p>
               </div>
-
-              {/* Gestos de recibido */}
-              {!sentGesture && (
-                <div className="pt-2">
-                  <p className="text-center text-xs text-[var(--color-text)] opacity-50 mb-3">
-                    ¿Quieres responder con un gesto?
-                  </p>
-                  <div className="flex justify-center gap-2">
-                    {GESTURES.map((g) => (
-                      <button
-                        key={g.emoji}
-                        onClick={() => handleGesture(g.emoji)}
-                        className="w-11 h-11 rounded-full bg-white/80 flex items-center justify-center text-xl hover:scale-110 transition-transform active:scale-95"
-                        title={g.label}
-                      >
-                        {g.emoji}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {sentGesture && (
-                <p className="text-center text-sm text-[var(--color-text)] opacity-60">
-                  Enviaste {sentGesture}
-                </p>
-              )}
             </div>
           )}
         </Card>
@@ -182,13 +137,13 @@ export function Game({
         {bothRevealed && (
           <div className="mt-6 space-y-3">
             {isLastRound ? (
-              <Button onClick={handleFinish}>Terminamos por hoy</Button>
+              <Button onClick={onFinish}>Terminamos por hoy</Button>
             ) : (
-              <Button onClick={handleNext}>Siguiente carta</Button>
+              <Button onClick={onNextRound}>Siguiente carta</Button>
             )}
 
             {!isLastRound && (
-              <Button variant="ghost" onClick={handleFinish}>
+              <Button variant="ghost" onClick={onFinish}>
                 Mejor lo dejamos aquí
               </Button>
             )}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import type { GameResponse } from '../lib/supabase';
 import { getRandomMirrorPrompts, MIRROR_PROMPTS, type MirrorPrompt } from '../data/mirror';
@@ -61,20 +61,26 @@ export function useMirror(
       setPrompts(newPrompts);
       setCurrentRound(1);
     } else {
-      // Player 2 espera
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const { data: roomRetry } = await supabase
-        .from('rooms')
-        .select('game_cards, game_round')
-        .eq('id', roomId)
-        .single();
+      // Jugador 2: esperar a que el jugador 1 cree los datos (polling con reintentos)
+      let retries = 0;
+      const maxRetries = 10;
+      while (retries < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const { data: roomRetry } = await supabase
+          .from('rooms')
+          .select('game_cards, game_round')
+          .eq('id', roomId)
+          .single();
 
-      if (roomRetry?.game_cards && roomRetry.game_cards.length > 0) {
-        const saved = roomRetry.game_cards
-          .map((id: string) => MIRROR_PROMPTS.find(p => p.id === id))
-          .filter(Boolean) as MirrorPrompt[];
-        setPrompts(saved);
-        setCurrentRound(roomRetry.game_round || 1);
+        if (roomRetry?.game_cards && roomRetry.game_cards.length > 0) {
+          const saved = roomRetry.game_cards
+            .map((id: string) => MIRROR_PROMPTS.find(p => p.id === id))
+            .filter(Boolean) as MirrorPrompt[];
+          setPrompts(saved);
+          setCurrentRound(roomRetry.game_round || 1);
+          break;
+        }
+        retries++;
       }
     }
 
@@ -111,15 +117,24 @@ export function useMirror(
     setResponses(new Map());
   }, [roomId]);
 
-  // Cargar al entrar
+  // Ref para rastrear si ya tenemos prompts (evita problemas de closure)
+  const promptsRef = useRef(prompts);
+  promptsRef.current = prompts;
+
+  // Cargar al entrar y polling continuo como fallback
   useEffect(() => {
     if (!roomId) return;
+
+    let isMounted = true;
+
     const load = async () => {
       const { data: room } = await supabase
         .from('rooms')
         .select('game_cards, game_round')
         .eq('id', roomId)
         .single();
+
+      if (!isMounted) return;
 
       if (room && room.game_cards && room.game_cards.length > 0) {
         const saved = room.game_cards
@@ -131,7 +146,19 @@ export function useMirror(
         setCurrentRound(room.game_round);
       }
     };
+
     load();
+
+    const pollInterval = setInterval(() => {
+      if (promptsRef.current.length === 0) {
+        load();
+      }
+    }, 1000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(pollInterval);
+    };
   }, [roomId]);
 
   // Suscripción a cambios en la sala (sincronizar ronda)
@@ -145,7 +172,7 @@ export function useMirror(
         schema: 'public',
         table: 'rooms',
         filter: `id=eq.${roomId}`,
-      }, (payload) => {
+      }, (payload: any) => {
         const room = payload.new as { game_round?: number; game_cards?: string[] };
         if (room.game_round && room.game_round !== currentRound) {
           setCurrentRound(room.game_round);
@@ -170,7 +197,7 @@ export function useMirror(
       const { data } = await supabase.from('game_responses').select().eq('room_id', roomId);
       if (data) {
         const newResponses = new Map<string, GameResponse>();
-        data.forEach(r => newResponses.set(`${r.round}-${r.player_number}`, r));
+        data.forEach((r: any) => newResponses.set(`${r.round}-${r.player_number}`, r));
         setResponses(newResponses);
       }
     };
@@ -183,7 +210,7 @@ export function useMirror(
         schema: 'public',
         table: 'game_responses',
         filter: `room_id=eq.${roomId}`,
-      }, (payload) => {
+      }, (payload: any) => {
         const response = payload.new as GameResponse;
         if (response) {
           setResponses(prev => {

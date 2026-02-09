@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import type { GameResponse } from '../lib/supabase';
 import {
@@ -136,21 +136,26 @@ export function useDrawGuess(
       setWords(newWords);
       setCurrentRound(1);
     } else {
-      // Player 2 espera
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Jugador 2: esperar a que el jugador 1 cree los datos (polling con reintentos)
+      let retries = 0;
+      const maxRetries = 10;
+      while (retries < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const { data: roomRetry } = await supabase
+          .from('rooms')
+          .select('game_cards, game_round')
+          .eq('id', roomId)
+          .single();
 
-      const { data: roomRetry } = await supabase
-        .from('rooms')
-        .select('game_cards, game_round')
-        .eq('id', roomId)
-        .single();
-
-      if (roomRetry?.game_cards && roomRetry.game_cards.length > 0) {
-        const savedWords = roomRetry.game_cards
-          .map((id: string) => DRAW_WORDS.find((w) => w.id === id))
-          .filter(Boolean) as DrawWord[];
-        setWords(savedWords);
-        setCurrentRound(roomRetry.game_round || 1);
+        if (roomRetry?.game_cards && roomRetry.game_cards.length > 0) {
+          const savedWords = roomRetry.game_cards
+            .map((id: string) => DRAW_WORDS.find((w) => w.id === id))
+            .filter(Boolean) as DrawWord[];
+          setWords(savedWords);
+          setCurrentRound(roomRetry.game_round || 1);
+          break;
+        }
+        retries++;
       }
     }
 
@@ -223,9 +228,15 @@ export function useDrawGuess(
     setResponses(new Map());
   }, [roomId]);
 
-  // Cargar palabras al entrar si ya existen
+  // Ref para rastrear si ya tenemos words (evita problemas de closure)
+  const wordsRef = useRef(words);
+  wordsRef.current = words;
+
+  // Cargar palabras al entrar si ya existen + polling continuo como fallback
   useEffect(() => {
     if (!roomId) return;
+
+    let isMounted = true;
 
     const loadWords = async () => {
       const { data: room } = await supabase
@@ -233,6 +244,8 @@ export function useDrawGuess(
         .select('game_cards, game_round')
         .eq('id', roomId)
         .single();
+
+      if (!isMounted) return;
 
       if (room?.game_cards && room.game_cards.length > 0) {
         const savedWords = room.game_cards
@@ -246,6 +259,17 @@ export function useDrawGuess(
     };
 
     loadWords();
+
+    const pollInterval = setInterval(() => {
+      if (wordsRef.current.length === 0) {
+        loadWords();
+      }
+    }, 1000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(pollInterval);
+    };
   }, [roomId]);
 
   // Suscripción a cambios en la sala (sincronizar ronda y palabras)
@@ -262,7 +286,7 @@ export function useDrawGuess(
           table: 'rooms',
           filter: `id=eq.${roomId}`,
         },
-        (payload) => {
+        (payload: any) => {
           const room = payload.new as { game_round?: number; game_cards?: string[] };
 
           if (room.game_round && room.game_round !== currentRound) {
@@ -297,7 +321,7 @@ export function useDrawGuess(
 
       if (data) {
         const newResponses = new Map<string, GameResponse>();
-        data.forEach((r) => {
+        data.forEach((r: any) => {
           const type = r.response_type || 'response';
           newResponses.set(`${r.round}-${type}-${r.player_number}`, r);
         });
@@ -318,7 +342,7 @@ export function useDrawGuess(
           table: 'game_responses',
           filter: `room_id=eq.${roomId}`,
         },
-        (payload) => {
+        (payload: any) => {
           const response = payload.new as GameResponse;
           if (response) {
             const type = response.response_type || 'response';

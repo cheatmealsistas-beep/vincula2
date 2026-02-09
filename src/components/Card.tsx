@@ -11,6 +11,7 @@ const cardColors: Record<CardType, string> = {
   express: 'bg-[var(--color-peach)]',
   listen: 'bg-[var(--color-mint)]',
   repair: 'bg-[var(--color-lavender)]',
+  mirror: 'bg-[#FFE4EC]',
   pause: 'bg-[var(--color-warm-gray)]',
 };
 
@@ -18,6 +19,7 @@ const cardLabels: Record<CardType, string> = {
   express: 'Expresar',
   listen: 'Escuchar',
   repair: 'Reparar',
+  mirror: 'Espejo',
   pause: 'Pausa',
 };
 

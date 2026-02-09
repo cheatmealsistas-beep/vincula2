@@ -1,23 +1,29 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import type { GameResponse } from '../lib/supabase';
 import { getBalancedCards, CARDS } from '../data/cards';
 import type { Card } from '../types';
+import type { RealtimeChannel } from '@supabase/supabase-js';
+
+interface SyncMessage {
+  type: 'game_state' | 'response' | 'next_round' | 'request_state' | 'game_finished';
+  payload: any;
+  from: 1 | 2;
+  timestamp: number;
+}
 
 interface UseGameReturn {
   cards: Card[];
   currentRound: number;
   myResponse: string | null;
   partnerResponse: string | null;
-  myGesture: string | null;
-  partnerGesture: string | null;
   bothRevealed: boolean;
   loading: boolean;
+  gameFinished: boolean;
   startGame: () => Promise<void>;
-  submitResponse: (response: string) => Promise<void>;
-  sendGesture: (gesture: string) => Promise<void>;
-  nextRound: () => Promise<void>;
-  resetGame: () => Promise<void>;
+  submitResponse: (response: string) => void;
+  nextRound: () => void;
+  resetGame: () => void;
+  finishGame: () => void;
 }
 
 export function useGame(
@@ -26,294 +32,178 @@ export function useGame(
 ): UseGameReturn {
   const [cards, setCards] = useState<Card[]>([]);
   const [currentRound, setCurrentRound] = useState(1);
-  const [responses, setResponses] = useState<Map<string, GameResponse>>(new Map());
+  const [responses, setResponses] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [gameFinished, setGameFinished] = useState(false);
+
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const stateRef = useRef({ cards, currentRound, responses });
+
+  useEffect(() => {
+    stateRef.current = { cards, currentRound, responses };
+  }, [cards, currentRound, responses]);
 
   const currentKey = `${currentRound}-${myPlayerNumber}`;
   const partnerKey = `${currentRound}-${myPlayerNumber === 1 ? 2 : 1}`;
 
-  const myResponseData = responses.get(currentKey);
-  const partnerResponseData = responses.get(partnerKey);
-
-  const myResponse = myResponseData?.response || null;
-  const partnerResponse = partnerResponseData?.response || null;
-  const myGesture = myResponseData?.gesture || null;
-  const partnerGesture = partnerResponseData?.gesture || null;
+  const myResponse = responses[currentKey] || null;
+  const partnerResponse = responses[partnerKey] || null;
   const bothRevealed = !!myResponse && !!partnerResponse;
 
-  // Iniciar juego - SOLO Player 1 genera cartas para evitar race condition
-  const startGame = useCallback(async () => {
+  const send = useCallback((message: Omit<SyncMessage, 'timestamp'>) => {
+    if (!channelRef.current || !myPlayerNumber) return;
+
+    channelRef.current.send({
+      type: 'broadcast',
+      event: 'sync',
+      payload: { ...message, timestamp: Date.now() },
+    });
+  }, [myPlayerNumber]);
+
+  const handleMessage = useCallback((message: SyncMessage) => {
+    switch (message.type) {
+      case 'game_state':
+        if (message.payload.cardIds) {
+          const saved = message.payload.cardIds
+            .map((id: string) => CARDS.find(c => c.id === id))
+            .filter(Boolean) as Card[];
+          setCards(saved);
+        }
+        setCurrentRound(message.payload.gameRound || 1);
+        setResponses(message.payload.responses || {});
+        setGameFinished(false);
+        setLoading(false);
+        break;
+
+      case 'response':
+        setResponses(prev => ({
+          ...prev,
+          [message.payload.key]: message.payload.data,
+        }));
+        break;
+
+      case 'next_round':
+        setCurrentRound(message.payload.round);
+        break;
+
+      case 'request_state':
+        if (myPlayerNumber === 1 && stateRef.current.cards.length > 0) {
+          send({
+            type: 'game_state',
+            payload: {
+              cardIds: stateRef.current.cards.map(c => c.id),
+              gameRound: stateRef.current.currentRound,
+              responses: stateRef.current.responses,
+            },
+            from: 1,
+          });
+        }
+        break;
+
+      case 'game_finished':
+        setGameFinished(true);
+        break;
+    }
+  }, [myPlayerNumber, send]);
+
+  useEffect(() => {
     if (!roomId || !myPlayerNumber) return;
 
-    setLoading(true);
-
-    // Verificar si ya hay cartas guardadas
-    const { data: room } = await supabase
-      .from('rooms')
-      .select('game_cards, game_round')
-      .eq('id', roomId)
-      .single();
-
-    if (room?.game_cards && room.game_cards.length > 0) {
-      // Ya hay cartas, usarlas
-      const savedCards = room.game_cards
-        .map((id: string) => CARDS.find((c) => c.id === id))
-        .filter(Boolean) as Card[];
-      setCards(savedCards);
-      setCurrentRound(room.game_round || 1);
-    } else if (myPlayerNumber === 1) {
-      // SOLO Player 1 genera nuevas cartas
-      const newCards = getBalancedCards();
-      const cardIds = newCards.map((c) => c.id);
-
-      await supabase
-        .from('rooms')
-        .update({ game_cards: cardIds, game_round: 1 })
-        .eq('id', roomId);
-
-      // Limpiar respuestas anteriores
-      await supabase.from('game_responses').delete().eq('room_id', roomId);
-
-      setCards(newCards);
-      setCurrentRound(1);
-    } else {
-      // Player 2 espera a que Player 1 genere las cartas
-      // Esperamos un poco y reintentamos
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const { data: roomRetry } = await supabase
-        .from('rooms')
-        .select('game_cards, game_round')
-        .eq('id', roomId)
-        .single();
-
-      if (roomRetry?.game_cards && roomRetry.game_cards.length > 0) {
-        const savedCards = roomRetry.game_cards
-          .map((id: string) => CARDS.find((c) => c.id === id))
-          .filter(Boolean) as Card[];
-        setCards(savedCards);
-        setCurrentRound(roomRetry.game_round || 1);
-      }
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
     }
 
-    setResponses(new Map());
-    setLoading(false);
-  }, [roomId, myPlayerNumber]);
+    const channel = supabase.channel(`cards:${roomId}`, {
+      config: { broadcast: { self: false } },
+    });
 
-  // Enviar respuesta
-  const submitResponse = useCallback(
-    async (response: string) => {
-      if (!roomId || !myPlayerNumber || cards.length === 0) return;
-
-      const currentCard = cards[currentRound - 1];
-
-      await supabase.from('game_responses').insert({
-        room_id: roomId,
-        player_number: myPlayerNumber,
-        round: currentRound,
-        card_id: currentCard.id,
-        response,
-      });
-    },
-    [roomId, myPlayerNumber, currentRound, cards]
-  );
-
-  // Enviar gesto
-  const sendGesture = useCallback(
-    async (gesture: string) => {
-      if (!roomId || !myPlayerNumber) return;
-
-      await supabase
-        .from('game_responses')
-        .update({ gesture })
-        .eq('room_id', roomId)
-        .eq('player_number', myPlayerNumber)
-        .eq('round', currentRound);
-    },
-    [roomId, myPlayerNumber, currentRound]
-  );
-
-  // Siguiente ronda - SINCRONIZADA en base de datos
-  const nextRound = useCallback(async () => {
-    if (!roomId) return;
-
-    const newRound = currentRound + 1;
-
-    // Actualizar en la base de datos para sincronizar
-    await supabase
-      .from('rooms')
-      .update({ game_round: newRound })
-      .eq('id', roomId);
-
-    setCurrentRound(newRound);
-  }, [roomId, currentRound]);
-
-  // Resetear juego
-  const resetGame = useCallback(async () => {
-    if (!roomId) return;
-
-    // Limpiar cartas guardadas para generar nuevas
-    await supabase
-      .from('rooms')
-      .update({ game_cards: null, game_round: 1 })
-      .eq('id', roomId);
-
-    setCards([]);
-    setCurrentRound(1);
-    setResponses(new Map());
-  }, [roomId]);
-
-  // Cargar cartas y ronda al entrar si ya existen
-  useEffect(() => {
-    if (!roomId) return;
-
-    const loadCards = async () => {
-      const { data: room } = await supabase
-        .from('rooms')
-        .select('game_cards, game_round')
-        .eq('id', roomId)
-        .single();
-
-      if (room?.game_cards && room.game_cards.length > 0) {
-        const savedCards = room.game_cards
-          .map((id: string) => CARDS.find((c) => c.id === id))
-          .filter(Boolean) as Card[];
-        setCards(savedCards);
-      }
-      if (room?.game_round) {
-        setCurrentRound(room.game_round);
-      }
-    };
-
-    loadCards();
-  }, [roomId]);
-
-  // Suscripción a cambios en la sala (para sincronizar ronda)
-  useEffect(() => {
-    if (!roomId) return;
-
-    const channel = supabase
-      .channel(`room-sync:${roomId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'rooms',
-          filter: `id=eq.${roomId}`,
-        },
-        (payload) => {
-          const room = payload.new as { game_round?: number; game_cards?: string[] };
-
-          // Sincronizar ronda
-          if (room.game_round && room.game_round !== currentRound) {
-            setCurrentRound(room.game_round);
-          }
-
-          // Sincronizar cartas si las generó el otro jugador
-          if (room.game_cards && room.game_cards.length > 0 && cards.length === 0) {
-            const savedCards = room.game_cards
-              .map((id: string) => CARDS.find((c) => c.id === id))
-              .filter(Boolean) as Card[];
-            setCards(savedCards);
-          }
-        }
-      )
+    channel
+      .on('broadcast', { event: 'sync' }, ({ payload }) => {
+        handleMessage(payload as SyncMessage);
+      })
       .subscribe();
 
+    channelRef.current = channel;
+
     return () => {
       supabase.removeChannel(channel);
+      channelRef.current = null;
     };
-  }, [roomId, currentRound, cards.length]);
+  }, [roomId, myPlayerNumber, handleMessage]);
 
-  // Suscripción a respuestas en tiempo real
-  useEffect(() => {
-    if (!roomId) return;
+  const startGame = useCallback(async () => {
+    if (!roomId || !myPlayerNumber) return;
+    setLoading(true);
 
-    // Cargar respuestas existentes
-    const loadResponses = async () => {
-      const { data } = await supabase
-        .from('game_responses')
-        .select()
-        .eq('room_id', roomId);
+    if (myPlayerNumber === 1) {
+      const newCards = getBalancedCards(5);
+      setCards(newCards);
+      setCurrentRound(1);
+      setResponses({});
+      setGameFinished(false);
 
-      if (data) {
-        const newResponses = new Map<string, GameResponse>();
-        data.forEach((r) => {
-          newResponses.set(`${r.round}-${r.player_number}`, r);
+      setTimeout(() => {
+        send({
+          type: 'game_state',
+          payload: { cardIds: newCards.map(c => c.id), gameRound: 1, responses: {} },
+          from: 1,
         });
-        setResponses(newResponses);
-      }
-    };
+        setLoading(false);
+      }, 300);
+    } else {
+      setGameFinished(false);
+      setTimeout(() => {
+        channelRef.current?.send({
+          type: 'broadcast',
+          event: 'sync',
+          payload: { type: 'request_state', payload: null, from: 2, timestamp: Date.now() },
+        });
+      }, 500);
+      setTimeout(() => setLoading(false), 5000);
+    }
+  }, [roomId, myPlayerNumber, send]);
 
-    loadResponses();
+  const submitResponse = useCallback((response: string) => {
+    if (!myPlayerNumber || cards.length === 0) return;
+    setResponses(prev => ({
+      ...prev,
+      [currentKey]: response,
+    }));
+    send({ type: 'response', payload: { key: currentKey, data: response }, from: myPlayerNumber });
+  }, [myPlayerNumber, cards.length, currentKey, send]);
 
-    // Suscripción a nuevas respuestas
-    const channelName = `game:${roomId}`;
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'game_responses',
-          filter: `room_id=eq.${roomId}`,
-        },
-        (payload) => {
-          const response = payload.new as GameResponse;
-          if (response) {
-            setResponses((prev) => {
-              const newMap = new Map(prev);
-              newMap.set(`${response.round}-${response.player_number}`, response);
-              return newMap;
-            });
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'game_responses',
-          filter: `room_id=eq.${roomId}`,
-        },
-        (payload) => {
-          const response = payload.new as GameResponse;
-          if (response) {
-            setResponses((prev) => {
-              const newMap = new Map(prev);
-              newMap.set(`${response.round}-${response.player_number}`, response);
-              return newMap;
-            });
-          }
-        }
-      )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('Cards game subscription active');
-        }
-      });
+  const nextRound = useCallback(() => {
+    if (!myPlayerNumber) return;
+    const newRound = currentRound + 1;
+    setCurrentRound(newRound);
+    send({ type: 'next_round', payload: { round: newRound }, from: myPlayerNumber });
+  }, [myPlayerNumber, currentRound, send]);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [roomId]);
+  const resetGame = useCallback(() => {
+    setCards([]);
+    setCurrentRound(1);
+    setResponses({});
+    setGameFinished(false);
+  }, []);
+
+  const finishGame = useCallback(() => {
+    if (!myPlayerNumber) return;
+    setGameFinished(true);
+    send({ type: 'game_finished', payload: { finished: true }, from: myPlayerNumber });
+  }, [myPlayerNumber, send]);
 
   return {
     cards,
     currentRound,
     myResponse,
     partnerResponse,
-    myGesture,
-    partnerGesture,
     bothRevealed,
     loading,
+    gameFinished,
     startGame,
     submitResponse,
-    sendGesture,
     nextRound,
     resetGame,
+    finishGame,
   };
 }

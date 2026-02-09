@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../components';
 import type { LovePhrase } from '../data/lovephrases';
+import { celebrateMatch } from '../utils/celebrations';
 
 interface LovePhrasesGameProps {
   phrases: LovePhrase[];
@@ -32,7 +33,10 @@ export function LovePhrasesGame({
   if (!currentPhrase) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
-        <p>Cargando...</p>
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-[var(--color-coral)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-[var(--color-text)]">Preparando frases de amor...</p>
+        </div>
       </div>
     );
   }
@@ -52,6 +56,13 @@ export function LovePhrasesGame({
       onNextRound();
     }
   };
+
+  // Animación de corazones cuando se revelan las frases
+  useEffect(() => {
+    if (bothRevealed) {
+      celebrateMatch();
+    }
+  }, [bothRevealed]);
 
   return (
     <div className="min-h-screen flex flex-col p-6 bg-[var(--color-cream)]">
@@ -95,7 +106,7 @@ export function LovePhrasesGame({
           <div className="text-center py-8">
             <div className="w-6 h-6 border-3 border-[var(--color-coral)] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
             <p className="text-[var(--color-text)] opacity-70">
-              Esperando a tu pareja...
+              Tu pareja está pensando...
             </p>
             <div className="mt-4 bg-white/50 rounded-2xl p-4">
               <p className="text-sm text-[var(--color-text)] opacity-60">Tu respuesta:</p>
@@ -105,7 +116,7 @@ export function LovePhrasesGame({
         ) : (
           <div className="space-y-4">
             {/* Revelación */}
-            <div className="text-center mb-4">
+            <div className="text-center mb-4 animate-fade-up">
               <span className="text-3xl">💕</span>
               <p className="text-sm text-[var(--color-text)] opacity-70 mt-1">
                 Vuestras respuestas
@@ -143,7 +154,7 @@ export function LovePhrasesGame({
       {bothRevealed && (
         <div className="mt-6">
           <Button onClick={handleNext}>
-            {isLastRound ? 'Terminar' : 'Siguiente frase'}
+            {isLastRound ? '¡Listo!' : 'Siguiente frase'}
           </Button>
         </div>
       )}

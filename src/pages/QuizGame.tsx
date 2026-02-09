@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../components';
 import { QuizIcon } from '../components/icons/GameIcons';
+import { celebrateMatch } from '../utils/celebrations';
 import type { QuizQuestion } from '../data/quiz';
 
 interface QuizGameProps {
@@ -32,6 +33,13 @@ export function QuizGame({
   const currentQuestion = questions[currentRound - 1];
   const isLastRound = currentRound === totalRounds;
 
+  // Confeti cuando se revelan las respuestas
+  useEffect(() => {
+    if (bothRevealed) {
+      celebrateMatch();
+    }
+  }, [bothRevealed]);
+
   // Alternar quién responde sobre sí mismo y quién adivina
   // Rondas impares: J1 responde sobre sí, J2 adivina
   // Rondas pares: J2 responde sobre sí, J1 adivina
@@ -45,7 +53,7 @@ export function QuizGame({
   if (!currentQuestion) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
-        <p>Cargando...</p>
+        <p>Un momento...</p>
       </div>
     );
   }
@@ -81,14 +89,25 @@ export function QuizGame({
         </p>
       </div>
 
+      {/* Indicador de rol */}
+      <div className={`
+        mb-4 px-4 py-2 rounded-full text-center text-sm font-medium
+        ${isMyTurnToReveal
+          ? 'bg-green-100 text-green-700'
+          : 'bg-purple-100 text-purple-700'
+        }
+      `}>
+        {isMyTurnToReveal
+          ? '🎯 Te toca: responde sobre TI'
+          : '🔮 Te toca: adivina sobre TU PAREJA'
+        }
+      </div>
+
       {/* Pregunta */}
       <div className="flex-1 flex flex-col">
         <div className="bg-white rounded-2xl p-6 mb-6 shadow-soft">
           <p className="text-lg font-medium text-[var(--color-text)] text-center">
             {myQuestionText}
-          </p>
-          <p className="text-xs text-center text-[var(--color-text)] opacity-50 mt-2">
-            {isMyTurnToReveal ? 'Responde sobre ti' : 'Adivina sobre tu pareja'}
           </p>
         </div>
 
@@ -110,7 +129,7 @@ export function QuizGame({
           <div className="text-center py-8">
             <div className="w-6 h-6 border-3 border-[var(--color-coral)] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
             <p className="text-[var(--color-text)] opacity-70">
-              Esperando a tu pareja...
+              Tu pareja está pensando...
             </p>
             <div className="mt-4 bg-white/50 rounded-2xl p-4">
               <p className="text-sm text-[var(--color-text)] opacity-60">Tu respuesta:</p>
@@ -145,7 +164,7 @@ export function QuizGame({
       {bothRevealed && (
         <div className="mt-6">
           <Button onClick={handleNext}>
-            {isLastRound ? 'Ver resumen' : 'Siguiente pregunta'}
+            {isLastRound ? '¡Listo!' : 'Siguiente pregunta'}
           </Button>
         </div>
       )}

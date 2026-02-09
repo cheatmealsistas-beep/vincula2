@@ -1,0 +1,25 @@
+<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="180" height="180" rx="40" fill="#FDF6E3"/>
+  <defs>
+    <linearGradient id="lav" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#B8A9FA"/>
+      <stop offset="100%" stop-color="#9D8DF1"/>
+    </linearGradient>
+    <linearGradient id="ros" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF6B9D"/>
+      <stop offset="100%" stop-color="#FF4081"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(30, 22) scale(1)">
+    <path d="M60 130
+      C49.3 103.7, 14.4 77.5, 16 46.5
+      C16.8 29.5, 34 24, 44.2 27.5
+      C54.4 31, 57.5 47.6, 60 66.5Z"
+      fill="url(#lav)"/>
+    <path d="M60 130
+      C70.7 103.7, 105.6 77.5, 104 46.5
+      C103.2 29.5, 86 24, 75.8 27.5
+      C65.6 31, 62.5 47.6, 60 66.5Z"
+      fill="url(#ros)"/>
+  </g>
+</svg>

@@ -45,7 +45,7 @@ export function WelcomeMessage({
 
         {/* Botón */}
         <Button onClick={onContinue}>
-          Entrar a la sala
+          Empezar 💕
         </Button>
       </div>
     </div>

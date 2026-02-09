@@ -1,3 +1,4 @@
+// Cliente real de Supabase para sincronización entre dispositivos
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -7,7 +8,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  realtime: {
+    params: {
+      eventsPerSecond: 10,
+    },
+  },
+});
 
 // Tipos para las tablas
 export interface Room {
@@ -19,7 +26,7 @@ export interface Room {
   pause_until?: string;
   game_type?: string;
   game_cards?: string[];
-  game_round?: number; // Ronda actual sincronizada
+  game_round?: number;
   invite_message?: string;
 }
 
@@ -39,7 +46,6 @@ export interface Message {
   message_type: string;
   prompt: string;
   content: string;
-  gesture?: string;
   read_at?: string;
   created_at: string;
 }
@@ -51,7 +57,6 @@ export interface GameResponse {
   round: number;
   card_id: string;
   response: string;
-  response_type?: string; // 'drawing', 'guess', etc.
-  gesture?: string;
+  response_type?: string;
   created_at: string;
 }

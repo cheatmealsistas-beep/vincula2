@@ -1,26 +1,52 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import {
   Home,
   JoinRoom,
-  InviteMessage,
+  ShareAndInvite,
+  GameSelect,
   WelcomeMessage,
+  WaitingForGame,
   Room,
-  Game,
-  WouldYouRatherGame,
-  QuizGame,
-  DrawGuessGame,
-  AdventureGame,
-  MirrorGame,
-  TimelineGame,
-  TimeCardsGame,
-  CalmGame,
-  LovePhrasesGame,
-  RandomPlanGame,
   LeaveMessage,
   ViewMessage,
   Pause,
   End,
 } from './pages';
+import {
+  saveSession,
+  getSession,
+  updateSession,
+  clearSession,
+} from './hooks/useSessionPersistence';
+
+// Lazy loading de juegos para reducir el bundle inicial
+const Game = lazy(() => import('./pages/Game').then(m => ({ default: m.Game })));
+const WouldYouRatherGame = lazy(() => import('./pages/WouldYouRatherGame').then(m => ({ default: m.WouldYouRatherGame })));
+const QuizGame = lazy(() => import('./pages/QuizGame').then(m => ({ default: m.QuizGame })));
+const DrawGuessGame = lazy(() => import('./pages/DrawGuessGame').then(m => ({ default: m.DrawGuessGame })));
+const AdventureGame = lazy(() => import('./pages/AdventureGame').then(m => ({ default: m.AdventureGame })));
+const MirrorGame = lazy(() => import('./pages/MirrorGame').then(m => ({ default: m.MirrorGame })));
+const TimelineGame = lazy(() => import('./pages/TimelineGame').then(m => ({ default: m.TimelineGame })));
+const TimeCardsGame = lazy(() => import('./pages/TimeCardsGame').then(m => ({ default: m.TimeCardsGame })));
+const CalmGame = lazy(() => import('./pages/CalmGame').then(m => ({ default: m.CalmGame })));
+const LovePhrasesGame = lazy(() => import('./pages/LovePhrasesGame').then(m => ({ default: m.LovePhrasesGame })));
+const RandomPlanGame = lazy(() => import('./pages/RandomPlanGame').then(m => ({ default: m.RandomPlanGame })));
+const SillyChallengesGame = lazy(() => import('./pages/SillyChallengesGame').then(m => ({ default: m.SillyChallengesGame })));
+const AbsurdPhrasesGame = lazy(() => import('./pages/AbsurdPhrasesGame').then(m => ({ default: m.AbsurdPhrasesGame })));
+const SpinWheelGame = lazy(() => import('./pages/SpinWheelGame').then(m => ({ default: m.SpinWheelGame })));
+
+// Fallback mientras carga un juego
+function GameLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-10 h-10 border-4 border-[var(--color-coral)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-[var(--color-text)] opacity-70">Preparando el juego...</p>
+      </div>
+    </div>
+  );
+}
+
 import { useRoom } from './hooks/useRoom';
 import { useGame } from './hooks/useGame';
 import { useWouldYouRather } from './hooks/useWouldYouRather';
@@ -33,13 +59,18 @@ import { useTimeCards } from './hooks/useTimeCards';
 import { useCalm } from './hooks/useCalm';
 import { useLovePhrases } from './hooks/useLovePhrases';
 import { useRandomPlan } from './hooks/useRandomPlan';
+import { useSillyChallenges } from './hooks/useSillyChallenges';
+import { useAbsurdPhrases } from './hooks/useAbsurdPhrases';
+import { useSpinWheel } from './hooks/useSpinWheel';
 import { getGameById } from './data/games';
 
 type Screen =
   | 'home'
   | 'join'
-  | 'invite-message'
-  | 'welcome-message'
+  | 'share-invite'    // Creador: compartir link + mensaje
+  | 'game-select'     // Creador: elegir juego
+  | 'welcome-message' // Invitado: ver mensaje del creador
+  | 'waiting-game'    // Invitado: esperar a que elijan juego
   | 'room'
   | 'game'
   | 'leave-message'
@@ -47,9 +78,9 @@ type Screen =
   | 'pause'
   | 'end';
 
-// Genera un código memorable tipo "LUNA42"
+// Genera un código memorable tipo "AMOR42"
 function generateCode(): string {
-  const words = ['LUNA', 'SOL', 'MAR', 'CIELO', 'RIO', 'LUZ', 'PAZ', 'AIRE'];
+  const words = ['AMOR', 'BESO', 'ALMA', 'MIEL', 'NIDO', 'LAZO', 'MIMO', 'LUNA'];
   const word = words[Math.floor(Math.random() * words.length)];
   const num = Math.floor(Math.random() * 90) + 10;
   return `${word}${num}`;
@@ -70,6 +101,20 @@ function App() {
   const [selectedGameType, setSelectedGameType] = useState<string>('cards');
   const [showWelcome, setShowWelcome] = useState(false);
   const [urlCode, setUrlCode] = useState<string | null>(null);
+  const [notification, setNotification] = useState<string | null>(null);
+  const [prevPartnerOnline, setPrevPartnerOnline] = useState<boolean | null>(null);
+
+  // Mostrar notificación temporal
+  const showNotification = (message: string) => {
+    setNotification(message);
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  // Guardar pantalla actual en sesión (wrapper de setScreen)
+  const navigateTo = (newScreen: Screen) => {
+    setScreen(newScreen);
+    updateSession({ currentScreen: newScreen });
+  };
 
   // Leer código de la URL al cargar
   useEffect(() => {
@@ -96,6 +141,7 @@ function App() {
     createRoom,
     joinRoom,
     leaveRoom,
+    setGameType,
     sendMessage,
     markMessageRead,
     setPause,
@@ -114,26 +160,221 @@ function App() {
   const calmGame = useCalm(room?.id || null, myPlayerNumber);
   const lovePhrasesGame = useLovePhrases(room?.id || null, myPlayerNumber);
   const randomPlanGame = useRandomPlan(room?.id || null, myPlayerNumber);
+  const sillyChallengesGame = useSillyChallenges(room?.id || null, myPlayerNumber);
+  const absurdPhrasesGame = useAbsurdPhrases(room?.id || null, myPlayerNumber);
+  const spinWheelGame = useSpinWheel(room?.id || null, myPlayerNumber);
 
   // Determinar qué juego está activo
-  const gameType = room?.game_type || 'cards';
+  const gameType = room?.game_type || selectedGameType || 'cards';
   const currentGameInfo = getGameById(gameType);
-  const selectedGameInfo = getGameById(selectedGameType);
+
+  // Función auxiliar para iniciar juego según tipo (definida antes de useEffects)
+  const startGameByType = async (type: string) => {
+    if (type === 'wouldyourather') {
+      await wyrGame.startGame();
+    } else if (type === 'quiz') {
+      await quizGame.startGame();
+    } else if (type === 'draw') {
+      await drawGame.startGame();
+    } else if (type === 'adventure') {
+      await adventureGame.startGame();
+    } else if (type === 'mirror') {
+      await mirrorGame.startGame();
+    } else if (type === 'timeline') {
+      await timelineGame.startGame();
+    } else if (type === 'timecards') {
+      await timeCardsGame.startGame();
+    } else if (type === 'calm') {
+      await calmGame.startCalm();
+    } else if (type === 'lovephrases') {
+      await lovePhrasesGame.startGame();
+    } else if (type === 'randomplan') {
+      await randomPlanGame.startGame();
+    } else if (type === 'sillychallenges') {
+      await sillyChallengesGame.startGame();
+    } else if (type === 'absurdphrases') {
+      await absurdPhrasesGame.startGame();
+    } else if (type === 'spinwheel') {
+      await spinWheelGame.startGame();
+    } else {
+      await cardsGame.startGame();
+    }
+  };
+
+  // Restaurar sesión al cargar
+  useEffect(() => {
+    const savedSession = getSession();
+    if (savedSession && !room) {
+      // Intentar reconectar a la sala guardada
+      joinRoom(savedSession.roomCode).then((success) => {
+        if (success) {
+          // Restaurar sesión según estado guardado
+          if (savedSession.gameType) {
+            setSelectedGameType(savedSession.gameType);
+          }
+
+          const savedScreen = savedSession.currentScreen;
+
+          // Si estaba en un juego o en 'end', no podemos restaurar el estado
+          // del juego en memoria, así que volvemos a una pantalla segura
+          if (!savedScreen || savedScreen === 'home' || savedScreen === 'game' || savedScreen === 'end') {
+            if (savedSession.playerNumber === 1) {
+              setScreen('game-select');
+            } else {
+              setScreen('waiting-game');
+            }
+          } else {
+            setScreen(savedScreen);
+          }
+          showNotification('¡Reconectado!');
+        } else {
+          clearSession();
+        }
+      });
+    }
+  }, []);
+
+  // Notificar cuando la pareja se conecta/desconecta
+  useEffect(() => {
+    if (prevPartnerOnline === null) {
+      // Primera vez, solo guardar estado
+      setPrevPartnerOnline(partnerOnline);
+      return;
+    }
+
+    if (prevPartnerOnline !== partnerOnline) {
+      if (partnerOnline) {
+        showNotification('Tu pareja ha vuelto 💜');
+      } else {
+        showNotification('Tu pareja se ha desconectado...');
+      }
+      setPrevPartnerOnline(partnerOnline);
+    }
+  }, [partnerOnline, prevPartnerOnline]);
+
+  // Invitado: detectar cuando el creador inicia un juego
+  useEffect(() => {
+    console.log('[App] Checking game start:', { screen, gameType: room?.game_type, myPlayerNumber });
+    if (screen === 'waiting-game' && room?.game_type && myPlayerNumber === 2) {
+      // El creador ha elegido un juego, empezar
+      console.log('[App] Invitado detectó juego:', room.game_type);
+      setSelectedGameType(room.game_type);
+      updateSession({ gameType: room.game_type, currentScreen: 'game' });
+      startGameByType(room.game_type);
+      setScreen('game');
+    }
+  }, [room?.game_type, screen, myPlayerNumber]);
+
+  // Efecto para manejar cuando la pareja termina el juego
+  useEffect(() => {
+    if (screen === 'game') {
+      if (sillyChallengesGame.gameFinished && gameType === 'sillychallenges') {
+        setScreen('end');
+      }
+      if (absurdPhrasesGame.gameFinished && gameType === 'absurdphrases') {
+        setScreen('end');
+      }
+      if (wyrGame.gameFinished && gameType === 'wouldyourather') {
+        setScreen('end');
+      }
+      if (lovePhrasesGame.gameFinished && gameType === 'lovephrases') {
+        setScreen('end');
+      }
+      if (timelineGame.gameFinished && gameType === 'timeline') {
+        setScreen('end');
+      }
+      if (cardsGame.gameFinished && gameType === 'cards') {
+        setScreen('end');
+      }
+      if (spinWheelGame.gameFinished && gameType === 'spinwheel') {
+        setScreen('end');
+      }
+    }
+  }, [
+    sillyChallengesGame.gameFinished,
+    absurdPhrasesGame.gameFinished,
+    wyrGame.gameFinished,
+    lovePhrasesGame.gameFinished,
+    timelineGame.gameFinished,
+    cardsGame.gameFinished,
+    spinWheelGame.gameFinished,
+    screen,
+    gameType,
+  ]);
+
+  // Estado temporal para código generado (para guardar sesión cuando room esté listo)
+  const [pendingCode, setPendingCode] = useState<string | null>(null);
+
+  // Efecto para guardar sesión cuando la sala se crea
+  useEffect(() => {
+    if (pendingCode && room && myPlayerNumber === 1) {
+      saveSession({
+        roomId: room.id,
+        roomCode: pendingCode,
+        playerNumber: 1,
+        currentScreen: 'share-invite',
+      });
+      setPendingCode(null);
+      setScreen('share-invite');
+    }
+  }, [room, pendingCode, myPlayerNumber]);
 
   // --- Handlers de navegación ---
 
-  const handleSelectGame = (gameTypeSelected: string) => {
-    setSelectedGameType(gameTypeSelected);
-    setScreen('invite-message');
+  // Creador: Home → crea sala → ShareAndInvite
+  const handleStartAsHost = async () => {
+    const code = generateCode();
+    setPendingCode(code);
+    await createRoom(code);
+    // La navegación se hace en el useEffect de arriba cuando room esté listo
   };
 
-  const handleCreateRoomWithMessage = async (inviteMessage?: string) => {
-    const code = generateCode();
-    const success = await createRoom(code, selectedGameType, inviteMessage);
-    if (success) {
-      setScreen('room');
+  // Creador: ShareAndInvite → GameSelect
+  const handleShareContinue = (inviteMessage?: string) => {
+    if (inviteMessage && room) {
+      // Guardar mensaje de invitación en la sala
+      updateSession({ inviteMessage });
     }
+    navigateTo('game-select');
   };
+
+  // Creador: GameSelect → selecciona juego → inicia juego
+  const handleSelectAndStartGame = async (gameTypeSelected: string) => {
+    setSelectedGameType(gameTypeSelected);
+    updateSession({ gameType: gameTypeSelected, currentScreen: 'game' });
+    // Actualizar el game_type en Supabase (para que el invitado lo vea)
+    await setGameType(gameTypeSelected);
+    // Iniciar el juego seleccionado
+    await startGameByType(gameTypeSelected);
+    setScreen('game');
+  };
+
+  // Estado para código de unión pendiente
+  const [pendingJoinCode, setPendingJoinCode] = useState<string | null>(null);
+
+  // Efecto para manejar cuando el invitado se une
+  useEffect(() => {
+    if (pendingJoinCode && room && myPlayerNumber === 2) {
+      const initialScreen = room.invite_message ? 'welcome-message' : 'waiting-game';
+      saveSession({
+        roomId: room.id,
+        roomCode: pendingJoinCode,
+        playerNumber: 2,
+        inviteMessage: room.invite_message,
+        currentScreen: initialScreen,
+      });
+      setPendingJoinCode(null);
+
+      // Si hay mensaje de invitación, mostrar pantalla de bienvenida
+      if (room.invite_message) {
+        setShowWelcome(true);
+        setScreen('welcome-message');
+      } else {
+        // Sin mensaje, ir directo a esperar juego
+        setScreen('waiting-game');
+      }
+    }
+  }, [room, pendingJoinCode, myPlayerNumber]);
 
   const handleJoinRoom = async (code: string) => {
     if (code.length < 4) {
@@ -141,15 +382,13 @@ function App() {
       return;
     }
 
+    setPendingJoinCode(code);
     const success = await joinRoom(code);
-    if (success) {
-      setJoinError('');
-      // Si hay mensaje de invitación, mostrar pantalla de bienvenida
-      // El room ya está disponible después de joinRoom
-      setShowWelcome(true);
-      setScreen('welcome-message');
-    } else {
+    if (!success) {
+      setPendingJoinCode(null);
       setJoinError(error || 'No se pudo unir a la sala');
+    } else {
+      setJoinError('');
     }
   };
 
@@ -163,11 +402,13 @@ function App() {
 
   const handleWelcomeContinue = () => {
     setShowWelcome(false);
-    setScreen('room');
+    // Invitado va a esperar que el creador elija juego
+    navigateTo('waiting-game');
   };
 
   const handleGoHome = async () => {
     await leaveRoom();
+    clearSession();
     setScreen('home');
   };
 
@@ -194,6 +435,12 @@ function App() {
       await lovePhrasesGame.startGame();
     } else if (gameType === 'randomplan') {
       await randomPlanGame.startGame();
+    } else if (gameType === 'sillychallenges') {
+      await sillyChallengesGame.startGame();
+    } else if (gameType === 'absurdphrases') {
+      await absurdPhrasesGame.startGame();
+    } else if (gameType === 'spinwheel') {
+      await spinWheelGame.startGame();
     } else {
       await cardsGame.startGame();
     }
@@ -216,23 +463,12 @@ function App() {
     await resumeFromPause();
   };
 
-  const handleNeedCalm = async () => {
-    await calmGame.startCalm();
-    setScreen('game');
-  };
-
   // --- Handlers de Mensajes ---
 
   const handleSendMessage = async (type: string, content: string) => {
     const prompt = MESSAGE_PROMPTS[type] || type;
     await sendMessage(type, prompt, content);
     setScreen('room');
-  };
-
-  const handleSendGesture = async (gesture: string) => {
-    if (pendingMessage) {
-      await markMessageRead(pendingMessage.id, gesture);
-    }
   };
 
   const handleCloseMessage = async () => {
@@ -258,10 +494,6 @@ function App() {
     await cardsGame.submitResponse(response);
   };
 
-  const handleGameGesture = async (gesture: string) => {
-    await cardsGame.sendGesture(gesture);
-  };
-
   const handleNextRound = () => {
     if (gameType === 'wouldyourather') {
       wyrGame.nextRound();
@@ -277,6 +509,10 @@ function App() {
       timeCardsGame.nextRound();
     } else if (gameType === 'lovephrases') {
       lovePhrasesGame.nextRound();
+    } else if (gameType === 'sillychallenges') {
+      sillyChallengesGame.nextRound();
+    } else if (gameType === 'absurdphrases') {
+      absurdPhrasesGame.nextRound();
     } else {
       cardsGame.nextRound();
     }
@@ -314,6 +550,15 @@ function App() {
     } else if (gameType === 'randomplan') {
       await randomPlanGame.resetGame();
       await randomPlanGame.startGame();
+    } else if (gameType === 'sillychallenges') {
+      await sillyChallengesGame.resetGame();
+      await sillyChallengesGame.startGame();
+    } else if (gameType === 'absurdphrases') {
+      await absurdPhrasesGame.resetGame();
+      await absurdPhrasesGame.startGame();
+    } else if (gameType === 'spinwheel') {
+      spinWheelGame.reset();
+      await spinWheelGame.startGame();
     } else {
       await cardsGame.resetGame();
       await cardsGame.startGame();
@@ -383,7 +628,6 @@ function App() {
         type: pendingMessage.message_type,
         prompt: pendingMessage.prompt,
         content: pendingMessage.content,
-        gesture: pendingMessage.gesture,
       }
     : null;
 
@@ -393,7 +637,7 @@ function App() {
       <div className="max-w-md mx-auto">
       {screen === 'home' && (
         <Home
-          onCreateRoom={handleSelectGame}
+          onCreateRoom={handleStartAsHost}
           onJoinRoom={() => setScreen('join')}
         />
       )}
@@ -406,15 +650,25 @@ function App() {
         />
       )}
 
-      {screen === 'invite-message' && selectedGameInfo && (
-        <InviteMessage
-          gameId={selectedGameInfo.id}
-          gameName={selectedGameInfo.name}
-          onContinue={handleCreateRoomWithMessage}
-          onBack={() => setScreen('home')}
+      {/* Creador: Compartir link + mensaje opcional */}
+      {screen === 'share-invite' && room && (
+        <ShareAndInvite
+          code={room.code}
+          onContinue={handleShareContinue}
+          onBack={handleGoHome}
         />
       )}
 
+      {/* Creador: Elegir juego */}
+      {screen === 'game-select' && room && (
+        <GameSelect
+          partnerOnline={partnerOnline}
+          onSelectGame={handleSelectAndStartGame}
+          onBack={() => setScreen('share-invite')}
+        />
+      )}
+
+      {/* Invitado: Ver mensaje del creador */}
       {screen === 'welcome-message' && room?.invite_message && showWelcome && (
         <WelcomeMessage
           message={room.invite_message}
@@ -424,25 +678,21 @@ function App() {
         />
       )}
 
-      {/* Si no hay mensaje de invitación, ir directo a la sala */}
-      {screen === 'welcome-message' && (!room?.invite_message || !showWelcome) && room && (
-        <Room
-          code={room.code}
-          partnerOnline={partnerOnline}
-          partnerLastSeen={partnerLastSeen || undefined}
-          hasPendingMessage={!!pendingMessage}
-          isPaused={isPaused}
-          pauseMessage={pauseMessage || undefined}
-          gameId={currentGameInfo?.id}
-          gameName={currentGameInfo?.name}
-          onPlayTogether={handlePlayTogether}
-          onLeaveMessage={handleLeaveMessage}
-          onViewMessage={handleViewMessage}
-          onPause={handlePause}
-          onResume={handleResume}
-          onLeave={handleGoHome}
-          onNeedCalm={handleNeedCalm}
-        />
+      {/* Invitado: Esperar a que el creador elija juego */}
+      {screen === 'waiting-game' && (
+        room ? (
+          <WaitingForGame
+            inviteMessage={room.invite_message}
+            onLeave={handleGoHome}
+          />
+        ) : (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="text-center">
+              <div className="w-10 h-10 border-4 border-[var(--color-coral)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-[var(--color-text)] opacity-70">Conectando...</p>
+            </div>
+          </div>
+        )
       )}
 
       {screen === 'room' && room && (
@@ -461,7 +711,6 @@ function App() {
           onPause={handlePause}
           onResume={handleResume}
           onLeave={handleGoHome}
-          onNeedCalm={handleNeedCalm}
         />
       )}
 
@@ -472,7 +721,6 @@ function App() {
       {screen === 'view-message' && formattedPendingMessage && (
         <ViewMessage
           message={formattedPendingMessage}
-          onGesture={handleSendGesture}
           onClose={handleCloseMessage}
         />
       )}
@@ -481,6 +729,8 @@ function App() {
         <Pause onConfirm={handleConfirmPause} onCancel={handleBackToRoom} />
       )}
 
+      {/* Juegos - con lazy loading */}
+      <Suspense fallback={<GameLoader />}>
       {/* Juego de Cartas */}
       {screen === 'game' && gameType === 'cards' && (
         <Game
@@ -491,9 +741,11 @@ function App() {
           partnerResponse={cardsGame.partnerResponse || undefined}
           bothRevealed={cardsGame.bothRevealed}
           onSubmitResponse={handleSubmitResponse}
-          onSendGesture={handleGameGesture}
           onNextRound={handleNextRound}
-          onFinish={handleFinish}
+          onFinish={() => {
+            cardsGame.finishGame();
+            handleFinish();
+          }}
         />
       )}
 
@@ -508,7 +760,10 @@ function App() {
           bothRevealed={wyrGame.bothRevealed}
           onSubmitChoice={handleSubmitChoice}
           onNextRound={handleNextRound}
-          onFinish={handleFinish}
+          onFinish={() => {
+            wyrGame.finishGame();
+            handleFinish();
+          }}
         />
       )}
 
@@ -592,7 +847,10 @@ function App() {
           bothRevealed={timelineGame.bothRevealed}
           onSubmitAnswer={handleSubmitTimelineAnswer}
           onNextRound={handleNextRound}
-          onFinish={handleFinish}
+          onFinish={() => {
+            timelineGame.finishGame();
+            handleFinish();
+          }}
         />
       )}
 
@@ -636,7 +894,10 @@ function App() {
           bothRevealed={lovePhrasesGame.bothRevealed}
           onSubmitAnswer={handleSubmitLovePhrasesAnswer}
           onNextRound={handleNextRound}
-          onFinish={handleFinish}
+          onFinish={() => {
+            lovePhrasesGame.finishGame();
+            handleFinish();
+          }}
         />
       )}
 
@@ -650,14 +911,78 @@ function App() {
           partnerHasRolled={randomPlanGame.partnerHasRolled}
           bothRevealed={randomPlanGame.bothRevealed}
           myCategories={randomPlanGame.myCategories}
+          myLocked={randomPlanGame.myLocked}
+          partnerLocked={randomPlanGame.partnerLocked}
+          canReroll={randomPlanGame.canReroll}
           onRollDice={handleRollDice}
-          onReroll={randomPlanGame.reroll}
+          onRerollOption={randomPlanGame.rerollOption}
+          onLock={randomPlanGame.lockPlan}
           onFinish={handleFinish}
         />
       )}
 
+      {/* Retos */}
+      {screen === 'game' && gameType === 'sillychallenges' && (
+        <SillyChallengesGame
+          challenges={sillyChallengesGame.challenges}
+          currentRound={sillyChallengesGame.currentRound}
+          totalRounds={sillyChallengesGame.challenges.length}
+          iAmChallenged={sillyChallengesGame.iAmChallenged}
+          challengeCompleted={sillyChallengesGame.challengeCompleted}
+          partnerConfirmed={sillyChallengesGame.partnerConfirmed}
+          partnerRejected={sillyChallengesGame.partnerRejected}
+          onCompleteChallenge={sillyChallengesGame.completeChallenge}
+          onConfirmPartner={sillyChallengesGame.confirmPartnerChallenge}
+          onRejectPartner={sillyChallengesGame.rejectPartnerChallenge}
+          onNextRound={handleNextRound}
+          onFinish={() => {
+            sillyChallengesGame.finishGame();
+            handleFinish();
+          }}
+        />
+      )}
+
+      {/* Completa la Frase */}
+      {screen === 'game' && gameType === 'absurdphrases' && (
+        <AbsurdPhrasesGame
+          phrases={absurdPhrasesGame.phrases}
+          currentRound={absurdPhrasesGame.currentRound}
+          totalRounds={absurdPhrasesGame.phrases.length}
+          myAnswer={absurdPhrasesGame.myAnswer}
+          partnerAnswer={absurdPhrasesGame.partnerAnswer}
+          bothRevealed={absurdPhrasesGame.bothRevealed}
+          onSubmitAnswer={absurdPhrasesGame.submitAnswer}
+          onNextRound={handleNextRound}
+          onFinish={() => {
+            absurdPhrasesGame.finishGame();
+            handleFinish();
+          }}
+        />
+      )}
+
+      {/* Gira y... */}
+      {screen === 'game' && gameType === 'spinwheel' && (
+        <SpinWheelGame
+          level={spinWheelGame.level}
+          setLevel={spinWheelGame.setLevel}
+          currentSpin={spinWheelGame.currentSpin}
+          isSpinning={spinWheelGame.isSpinning}
+          spinCount={spinWheelGame.spinCount}
+          isMyTurn={spinWheelGame.isMyTurn}
+          onSpin={spinWheelGame.spin}
+          onFinish={() => {
+            spinWheelGame.finishGame();
+            handleFinish();
+          }}
+        />
+      )}
+      </Suspense>
+
       {screen === 'end' && (
-        <End onPlayAgain={handlePlayAgain} onGoHome={handleBackToRoom} />
+        <End
+          onPlayAgain={handlePlayAgain}
+          onExit={handleGoHome}
+        />
       )}
 
       {/* Indicador de carga */}
@@ -666,6 +991,17 @@ function App() {
           <div className="bg-white rounded-2xl p-6 text-center">
             <div className="w-8 h-8 border-4 border-[var(--color-coral)] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
             <p className="text-[var(--color-text)]">Un momento...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Notificación flotante */}
+      {notification && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-fade-up">
+          <div className="bg-white/95 backdrop-blur-sm rounded-full px-5 py-3 shadow-lg border border-gray-100">
+            <p className="text-[var(--color-text)] text-sm font-medium">
+              {notification}
+            </p>
           </div>
         </div>
       )}

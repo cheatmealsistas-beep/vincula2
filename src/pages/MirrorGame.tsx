@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../components';
 import { MirrorIcon } from '../components/icons/GameIcons';
 import type { MirrorPrompt } from '../data/mirror';
+import { celebrateMatch } from '../utils/celebrations';
 
 interface MirrorGameProps {
   prompts: MirrorPrompt[];
@@ -33,7 +34,7 @@ export function MirrorGame({
   if (!currentPrompt) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
-        <p>Cargando...</p>
+        <p>Un momento...</p>
       </div>
     );
   }
@@ -53,6 +54,13 @@ export function MirrorGame({
       onNextRound();
     }
   };
+
+  // Animación de corazones cuando se revelan los reflejos
+  useEffect(() => {
+    if (bothRevealed) {
+      celebrateMatch();
+    }
+  }, [bothRevealed]);
 
   return (
     <div className="min-h-screen flex flex-col p-6 bg-[var(--color-cream)]">
@@ -99,7 +107,7 @@ export function MirrorGame({
           <div className="text-center py-8">
             <div className="w-6 h-6 border-3 border-[var(--color-coral)] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
             <p className="text-[var(--color-text)] opacity-70">
-              Esperando el reflejo de tu pareja...
+              Tu pareja te está mirando...
             </p>
             <div className="mt-4 bg-white/50 rounded-2xl p-4">
               <p className="text-sm text-[var(--color-text)] opacity-60">Tu reflejo:</p>
@@ -147,7 +155,7 @@ export function MirrorGame({
       {bothRevealed && (
         <div className="mt-6">
           <Button onClick={handleNext}>
-            {isLastRound ? 'Terminar' : 'Siguiente reflejo'}
+            {isLastRound ? 'Cerrar el espejo' : 'Siguiente reflejo'}
           </Button>
         </div>
       )}

@@ -23,7 +23,7 @@ export function JoinRoom({ onJoin, onBack, error }: JoinRoomProps) {
         {/* Título */}
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-[var(--color-text)] mb-2">
-            Unirse a una sala
+            Tu pareja te espera
           </h1>
           <p className="text-[var(--color-text)] opacity-70">
             Introduce el código que te han compartido

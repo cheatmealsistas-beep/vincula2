@@ -109,12 +109,21 @@ export function useAdventure(
   }, [roomId, myPlayerNumber, currentEventId, completedEventIds]);
 
   const completeEvent = useCallback(async () => {
-    if (!currentEventId) return;
+    if (!currentEventId || !roomId || !myPlayerNumber) return;
     setCompletedEventIds(prev => [...prev, currentEventId]);
-    setCurrentEventId(null);
     setMyVote(null);
     setPartnerVote(null);
-  }, [currentEventId]);
+
+    // Notificar a la pareja que el evento se completó
+    await supabase.from('game_responses').insert({
+      room_id: roomId,
+      player_number: myPlayerNumber,
+      round: completedEventIds.length + 1,
+      card_id: currentEventId,
+      response: 'complete',
+      response_type: 'complete',
+    });
+  }, [currentEventId, roomId, myPlayerNumber, completedEventIds]);
 
   const resetGame = useCallback(async () => {
     if (!roomId) return;
@@ -155,7 +164,7 @@ export function useAdventure(
         .eq('room_id', roomId);
 
       if (data) {
-        data.forEach((r) => {
+        data.forEach((r: any) => {
           if (r.response_type === 'avatar') {
             if (r.player_number === myPlayerNumber) {
               setMyAvatarId(r.response);
@@ -183,7 +192,7 @@ export function useAdventure(
         schema: 'public',
         table: 'game_responses',
         filter: `room_id=eq.${roomId}`,
-      }, (payload) => {
+      }, (payload: any) => {
         const r = payload.new as any;
         if (!r) return;
 
@@ -195,6 +204,18 @@ export function useAdventure(
         }
         if (r.response_type === 'move' && r.player_number !== myPlayerNumber) {
           setCurrentEventId(r.card_id);
+          // Reset votos cuando cambia de evento
+          setMyVote(null);
+          setPartnerVote(null);
+        }
+        if (r.response_type === 'complete' && r.player_number !== myPlayerNumber) {
+          // Sincronizar eventos completados
+          setCompletedEventIds(prev => {
+            if (!prev.includes(r.card_id)) {
+              return [...prev, r.card_id];
+            }
+            return prev;
+          });
         }
       })
       .subscribe();

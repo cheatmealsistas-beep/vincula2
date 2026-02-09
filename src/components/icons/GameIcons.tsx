@@ -153,6 +153,60 @@ export function RandomPlanIcon({ className = "w-8 h-8" }: { className?: string }
   );
 }
 
+export function SillyChallengesIcon({ className = "w-8 h-8" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Carpa de circo / fiesta */}
+      <path d="M6 28L20 8L34 28" fill="#9D8DF1" />
+      <path d="M6 28L13 8L20 28" fill="#FF4081" />
+      <path d="M20 28L27 8L34 28" fill="#FF4081" />
+      {/* Banderín arriba */}
+      <path d="M20 4L24 8L20 8Z" fill="#FFD54F" />
+      {/* Base */}
+      <rect x="4" y="28" width="32" height="4" rx="2" fill="#4A4A6A" />
+      {/* Estrellas decorativas */}
+      <circle cx="10" cy="20" r="1.5" fill="white" />
+      <circle cx="30" cy="20" r="1.5" fill="white" />
+      <circle cx="20" cy="18" r="1.5" fill="white" />
+    </svg>
+  );
+}
+
+export function AbsurdPhrasesIcon({ className = "w-8 h-8" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Burbuja de texto con puntos suspensivos */}
+      <path d="M6 10C6 7 9 5 14 5H26C31 5 34 7 34 10V22C34 25 31 27 26 27H22L16 33L17 27H14C9 27 6 25 6 22V10Z"
+        fill="#9D8DF1" />
+      {/* Puntos suspensivos */}
+      <circle cx="14" cy="16" r="2.5" fill="white" />
+      <circle cx="20" cy="16" r="2.5" fill="#FF4081" />
+      <circle cx="26" cy="16" r="2.5" fill="white" />
+      {/* Signos de interrogación/exclamación pequeños */}
+      <text x="11" y="35" fill="#FF4081" fontSize="8" fontWeight="bold">?!</text>
+    </svg>
+  );
+}
+
+export function SpinWheelIcon({ className = "w-8 h-8" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Ruleta circular */}
+      <circle cx="20" cy="20" r="15" fill="#9D8DF1" />
+      {/* Secciones de la ruleta */}
+      <path d="M20 5L20 20L32.99 12.5Z" fill="#FF4081" />
+      <path d="M20 20L32.99 27.5L20 35Z" fill="#FF4081" />
+      <path d="M20 20L7.01 12.5L20 5Z" fill="#FFB5E8" />
+      <path d="M7.01 27.5L20 20L20 35Z" fill="#FFB5E8" />
+      {/* Centro de la ruleta */}
+      <circle cx="20" cy="20" r="4" fill="white" />
+      <circle cx="20" cy="20" r="2" fill="#FF4081" />
+      {/* Flecha indicadora */}
+      <path d="M20 2L23 8L17 8Z" fill="#4A4A6A" />
+    </svg>
+  );
+}
+
 // Mapa de iconos por ID de juego
 export const gameIconMap: Record<string, React.FC<{ className?: string }>> = {
   cards: CardsIcon,
@@ -166,6 +220,9 @@ export const gameIconMap: Record<string, React.FC<{ className?: string }>> = {
   calm: CalmIcon,
   lovephrases: LovePhrasesIcon,
   randomplan: RandomPlanIcon,
+  sillychallenges: SillyChallengesIcon,
+  absurdphrases: AbsurdPhrasesIcon,
+  spinwheel: SpinWheelIcon,
 };
 
 export function GameIcon({ gameId, className = "w-8 h-8" }: { gameId: string; className?: string }) {

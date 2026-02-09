@@ -148,52 +148,56 @@ export function DrawCanvas({ onDrawingChange, disabled, remoteDrawing }: DrawCan
       {/* Controles (solo si no está deshabilitado) */}
       {!disabled && (
         <div className="flex items-center justify-between gap-2">
-          {/* Colores */}
-          <div className="flex gap-1.5">
+          {/* Colores - touch targets mínimo 44px */}
+          <div className="flex gap-1">
             {colors.map((c) => (
               <button
                 key={c}
                 onClick={() => setColor(c)}
-                className={`w-7 h-7 rounded-full transition-transform ${
-                  color === c ? 'scale-110 ring-2 ring-offset-1 ring-gray-400' : ''
+                className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+                  color === c ? 'scale-110 ring-2 ring-offset-2 ring-[var(--color-coral)]' : 'hover:scale-105'
                 }`}
-                style={{ backgroundColor: c }}
-              />
+              >
+                <span
+                  className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
+                  style={{ backgroundColor: c }}
+                />
+              </button>
             ))}
           </div>
 
-          {/* Tamaño del pincel */}
-          <div className="flex items-center gap-2">
+          {/* Tamaño del pincel - touch targets mínimo 44px */}
+          <div className="flex items-center gap-1">
             <button
               onClick={() => setBrushSize(2)}
-              className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                brushSize === 2 ? 'bg-gray-200' : ''
+              className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all ${
+                brushSize === 2 ? 'bg-[var(--color-coral)]/20 ring-2 ring-[var(--color-coral)]' : 'bg-gray-100 hover:bg-gray-200'
               }`}
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-gray-600" />
+              <span className="w-2 h-2 rounded-full bg-gray-700" />
             </button>
             <button
               onClick={() => setBrushSize(4)}
-              className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                brushSize === 4 ? 'bg-gray-200' : ''
+              className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all ${
+                brushSize === 4 ? 'bg-[var(--color-coral)]/20 ring-2 ring-[var(--color-coral)]' : 'bg-gray-100 hover:bg-gray-200'
               }`}
             >
-              <span className="w-2.5 h-2.5 rounded-full bg-gray-600" />
+              <span className="w-3 h-3 rounded-full bg-gray-700" />
             </button>
             <button
               onClick={() => setBrushSize(8)}
-              className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                brushSize === 8 ? 'bg-gray-200' : ''
+              className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all ${
+                brushSize === 8 ? 'bg-[var(--color-coral)]/20 ring-2 ring-[var(--color-coral)]' : 'bg-gray-100 hover:bg-gray-200'
               }`}
             >
-              <span className="w-4 h-4 rounded-full bg-gray-600" />
+              <span className="w-5 h-5 rounded-full bg-gray-700" />
             </button>
           </div>
 
-          {/* Borrar */}
+          {/* Borrar - touch target mínimo 44px */}
           <button
             onClick={clearCanvas}
-            className="px-3 py-1.5 text-sm bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            className="px-4 py-2.5 min-h-[44px] text-sm font-medium bg-gray-100 rounded-xl hover:bg-gray-200 active:bg-gray-300 transition-colors"
           >
             Borrar
           </button>

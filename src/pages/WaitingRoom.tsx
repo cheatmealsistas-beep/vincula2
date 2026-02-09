@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Button } from '../components';
 
 interface WaitingRoomProps {
@@ -10,22 +11,41 @@ interface WaitingRoomProps {
 
 export function WaitingRoom({ code, playerCount, onStart, onLeave, isHost }: WaitingRoomProps) {
   const canStart = playerCount === 2;
+  const [copied, setCopied] = useState(false);
+
+  // URL para compartir
+  const shareUrl = `https://cheatmealsistas-beep.github.io/vincula2/?code=${code}`;
 
   const handleShare = async () => {
-    const shareText = `¿Jugamos a Vínculo? Entra con el código: ${code}`;
-
+    // Intentar usar Web Share API (móviles)
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'Vínculo',
-          text: shareText,
+          title: 'Vincula2',
+          text: `¡Juega conmigo! Entra con el código ${code}`,
+          url: shareUrl,
         });
+        return;
       } catch {
-        // Usuario canceló o error
+        // El usuario canceló o no se pudo compartir
       }
-    } else {
-      // Fallback: copiar al portapapeles
-      await navigator.clipboard.writeText(shareText);
+    }
+
+    // Fallback: copiar al portapapeles
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback para navegadores antiguos
+      const textArea = document.createElement('textarea');
+      textArea.value = shareUrl;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
@@ -35,7 +55,7 @@ export function WaitingRoom({ code, playerCount, onStart, onLeave, isHost }: Wai
         {/* Código grande */}
         <div className="mb-8">
           <p className="text-sm text-[var(--color-text)] opacity-60 mb-2">
-            Tu código de sala
+            Vuestro código
           </p>
           <div className="text-5xl font-bold font-mono tracking-widest text-[var(--color-text)]">
             {code}
@@ -48,10 +68,29 @@ export function WaitingRoom({ code, playerCount, onStart, onLeave, isHost }: Wai
             <>
               <div className="w-8 h-8 border-4 border-[var(--color-coral)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
               <p className="text-[var(--color-text)]">
-                Esperando a la otra persona...
+                Tu pareja está de camino...
               </p>
-              <p className="text-sm text-[var(--color-text)] opacity-60 mt-2">
-                Comparte el código para que pueda entrar
+
+              {/* Botón compartir link */}
+              <button
+                onClick={handleShare}
+                className="mt-4 w-full py-3 px-4 bg-[var(--color-lavender)] rounded-xl text-[var(--color-text)] font-medium flex items-center justify-center gap-2 active:scale-95 transition-transform"
+              >
+                {copied ? (
+                  <>
+                    <span>✓</span>
+                    <span>¡Link copiado!</span>
+                  </>
+                ) : (
+                  <>
+                    <span>📤</span>
+                    <span>Enviar link a tu pareja</span>
+                  </>
+                )}
+              </button>
+
+              <p className="text-xs text-[var(--color-text)] opacity-50 mt-3">
+                O dile el código: <span className="font-mono font-bold">{code}</span>
               </p>
             </>
           ) : (
@@ -69,12 +108,6 @@ export function WaitingRoom({ code, playerCount, onStart, onLeave, isHost }: Wai
 
         {/* Acciones */}
         <div className="space-y-4">
-          {playerCount < 2 && (
-            <Button onClick={handleShare}>
-              Compartir código
-            </Button>
-          )}
-
           {canStart && isHost && (
             <Button onClick={onStart}>
               Empezar a jugar
@@ -82,7 +115,7 @@ export function WaitingRoom({ code, playerCount, onStart, onLeave, isHost }: Wai
           )}
 
           <Button variant="ghost" onClick={onLeave}>
-            Salir de la sala
+            Volver
           </Button>
         </div>
       </div>

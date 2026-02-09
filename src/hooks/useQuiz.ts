@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import type { GameResponse } from '../lib/supabase';
 import {
@@ -75,21 +75,26 @@ export function useQuiz(
       setQuestions(newQuestions);
       setCurrentRound(1);
     } else {
-      // Player 2 espera a que Player 1 genere las preguntas
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Jugador 2: esperar a que el jugador 1 cree los datos (polling con reintentos)
+      let retries = 0;
+      const maxRetries = 10;
+      while (retries < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const { data: roomRetry } = await supabase
+          .from('rooms')
+          .select('game_cards, game_round')
+          .eq('id', roomId)
+          .single();
 
-      const { data: roomRetry } = await supabase
-        .from('rooms')
-        .select('game_cards, game_round')
-        .eq('id', roomId)
-        .single();
-
-      if (roomRetry?.game_cards && roomRetry.game_cards.length > 0) {
-        const savedQuestions = roomRetry.game_cards
-          .map((id: string) => QUIZ_QUESTIONS.find((q) => q.id === id))
-          .filter(Boolean) as QuizQuestion[];
-        setQuestions(savedQuestions);
-        setCurrentRound(roomRetry.game_round || 1);
+        if (roomRetry?.game_cards && roomRetry.game_cards.length > 0) {
+          const savedQuestions = roomRetry.game_cards
+            .map((id: string) => QUIZ_QUESTIONS.find((q) => q.id === id))
+            .filter(Boolean) as QuizQuestion[];
+          setQuestions(savedQuestions);
+          setCurrentRound(roomRetry.game_round || 1);
+          break;
+        }
+        retries++;
       }
     }
 
@@ -143,9 +148,15 @@ export function useQuiz(
     setResponses(new Map());
   }, [roomId]);
 
-  // Cargar preguntas al entrar si ya existen
+  // Ref para rastrear si ya tenemos questions (evita problemas de closure)
+  const questionsRef = useRef(questions);
+  questionsRef.current = questions;
+
+  // Cargar preguntas al entrar si ya existen + polling continuo como fallback
   useEffect(() => {
     if (!roomId) return;
+
+    let isMounted = true;
 
     const loadQuestions = async () => {
       const { data: room } = await supabase
@@ -153,6 +164,8 @@ export function useQuiz(
         .select('game_cards, game_round')
         .eq('id', roomId)
         .single();
+
+      if (!isMounted) return;
 
       if (room?.game_cards && room.game_cards.length > 0) {
         const savedQuestions = room.game_cards
@@ -166,6 +179,17 @@ export function useQuiz(
     };
 
     loadQuestions();
+
+    const pollInterval = setInterval(() => {
+      if (questionsRef.current.length === 0) {
+        loadQuestions();
+      }
+    }, 1000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(pollInterval);
+    };
   }, [roomId]);
 
   // Suscripción a cambios en la sala (sincronizar ronda y preguntas)
@@ -182,7 +206,7 @@ export function useQuiz(
           table: 'rooms',
           filter: `id=eq.${roomId}`,
         },
-        (payload) => {
+        (payload: any) => {
           const room = payload.new as { game_round?: number; game_cards?: string[] };
 
           if (room.game_round && room.game_round !== currentRound) {
@@ -217,7 +241,7 @@ export function useQuiz(
 
       if (data) {
         const newResponses = new Map<string, GameResponse>();
-        data.forEach((r) => {
+        data.forEach((r: any) => {
           newResponses.set(`${r.round}-${r.player_number}`, r);
         });
         setResponses(newResponses);
@@ -237,7 +261,7 @@ export function useQuiz(
           table: 'game_responses',
           filter: `room_id=eq.${roomId}`,
         },
-        (payload) => {
+        (payload: any) => {
           const response = payload.new as GameResponse;
           if (response) {
             setResponses((prev) => {

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../components';
 import { TimelineIcon } from '../components/icons/GameIcons';
+import { celebrateMatch } from '../utils/celebrations';
 import type { TimelinePrompt } from '../data/timeline';
 
 interface TimelineGameProps {
@@ -16,11 +17,12 @@ interface TimelineGameProps {
 }
 
 const CATEGORY_COLORS: Record<TimelinePrompt['category'], string> = {
-  beginning: '#FFB5C5',
-  growth: '#B5EAAA',
-  challenges: '#B5D4FF',
-  joy: '#FFE5B5',
-  dreams: '#E5B5FF',
+  beginning: '#FFB5E8',
+  growth: '#B5DEFF',
+  challenges: '#9D8DF1',
+  joy: '#FFD700',
+  present: '#FF4081',
+  future: '#4ECDC4',
 };
 
 const CATEGORY_LABELS: Record<TimelinePrompt['category'], string> = {
@@ -28,7 +30,8 @@ const CATEGORY_LABELS: Record<TimelinePrompt['category'], string> = {
   growth: 'Crecimiento',
   challenges: 'Desafíos',
   joy: 'Alegría',
-  dreams: 'Sueños',
+  present: 'Presente',
+  future: 'Futuro',
 };
 
 export function TimelineGame({
@@ -47,10 +50,17 @@ export function TimelineGame({
   const currentPrompt = prompts[currentRound - 1];
   const isLastRound = currentRound >= totalRounds;
 
+  // Confeti cuando se revelan los recuerdos
+  useEffect(() => {
+    if (bothRevealed) {
+      celebrateMatch();
+    }
+  }, [bothRevealed]);
+
   if (!currentPrompt) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-[var(--color-cream)]">
-        <p className="text-[var(--color-text)]">Cargando momentos...</p>
+        <p className="text-[var(--color-text)]">Preparando recuerdos...</p>
       </div>
     );
   }
@@ -149,7 +159,7 @@ export function TimelineGame({
               Tu recuerdo está guardado
             </p>
             <p className="text-sm text-[var(--color-text)] opacity-70">
-              Esperando a que tu pareja comparta el suyo...
+              Tu pareja está recordando...
             </p>
           </div>
         ) : (
@@ -169,7 +179,7 @@ export function TimelineGame({
             {/* Botón continuar */}
             <div className="pt-4">
               <Button onClick={handleContinue}>
-                {isLastRound ? 'Ver nuestra historia completa' : 'Siguiente momento'}
+                {isLastRound ? '¡Listo!' : 'Siguiente momento'}
               </Button>
             </div>
           </div>

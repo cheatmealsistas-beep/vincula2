@@ -64,9 +64,34 @@ Los competidores (apps de comunicación, terapia tradicional) son:
 
 - **Frontend**: React + TypeScript + Vite
 - **Estilos**: Tailwind CSS v4
-- **Base de datos**: Supabase (PostgreSQL + Realtime)
-- **Hosting**: Netlify
+- **Backend**: Supabase (Realtime para sincronización)
+- **Hosting**: GitHub Pages
 - **Sin login obligatorio**: Acceso por código de sala
+
+## Arquitectura de datos (IMPORTANTE)
+
+**Supabase Real** - La app usa Supabase para sincronizar entre dispositivos:
+- URL: `https://duluwcxuwudjlpeyvehv.supabase.co`
+- Credenciales en `.env` (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
+- Cliente en `src/lib/supabase.ts`
+
+**Tablas en Supabase**:
+- `rooms` - Salas con código, estado, juego actual
+- `players` - Jugadores en cada sala (player_number 1 o 2)
+- `messages` - Mensajes asíncronos entre jugadores
+- `game_responses` - Respuestas de los juegos
+
+**Sincronización Realtime**:
+- Los hooks usan canales de Supabase Realtime (broadcast)
+- Cada juego tiene su propio canal: `cards:{roomId}`, `wyr:{roomId}`, etc.
+- Los mensajes se envían con `channel.send()` y se reciben con `.on('broadcast')`
+
+**Persistencia de sesión**:
+- `src/hooks/useSessionPersistence.ts` guarda la sesión en localStorage
+- Clave: `vincula2_session`
+- Contiene: roomId, roomCode, playerNumber, inviteMessage, gameType
+- Expira a las 4 horas
+- Permite recuperar la sala al refrescar el navegador
 
 ## Estructura del proyecto
 
@@ -85,30 +110,38 @@ vinculo-app/
 └── README.md
 ```
 
+## Flujo de usuario (NUEVO)
+
+**Creador (Host)**:
+1. Home → "¡Empezar!"
+2. ShareAndInvite → Comparte link + mensaje opcional
+3. GameSelect → Elige juego (ve si la pareja ya entró)
+4. Juego → Ambos juegan sincronizados
+5. End → Otra ronda o salir
+
+**Invitado (Guest)**:
+1. Entra por link con `?code=XXXX`
+2. WelcomeMessage → Ve mensaje del creador (si existe)
+3. WaitingForGame → Espera mientras el creador elige juego
+4. Juego → Ambos juegan sincronizados
+5. End → Otra ronda o salir
+
 ## Pantallas implementadas
 
-1. **Home** - Crear sala / Tengo un código
-2. **JoinRoom** - Introducir código
-3. **Room** - Sala de la pareja (hogar)
-   - Estado de presencia
-   - "Jugar juntos" / "Dejar algo para ti"
-   - Mensajes pendientes
-   - Pausa segura
-4. **LeaveMessage** - Elegir tipo y escribir mensaje asíncrono
-5. **ViewMessage** - Ver mensaje con gestos de recibido
-6. **Pause** - Pedir pausa con tiempo de retorno opcional
-7. **Game** - Cartas, escribir, revelar, gestos
-8. **End** - Cierre con opción de jugar otra ronda
-
-## Gestos de recibido
-
-| Gesto | Significado |
-|-------|-------------|
-| 💜 | Te quiero |
-| 🫂 | Te abrazo |
-| 👀 | Te leo |
-| 🙏 | Gracias |
-| 💭 | Lo pienso |
+| Pantalla | Descripción | Quién la ve |
+|----------|-------------|-------------|
+| Home | Crear sala / Tengo un código | Ambos |
+| JoinRoom | Introducir código manualmente | Invitado |
+| ShareAndInvite | Compartir link + mensaje opcional | Creador |
+| GameSelect | Elegir juego | Creador |
+| WelcomeMessage | Ver mensaje del creador | Invitado |
+| WaitingForGame | Esperar a que elijan juego | Invitado |
+| Room | Sala principal (mensajes, pausa) | Ambos |
+| LeaveMessage | Escribir mensaje asíncrono | Ambos |
+| ViewMessage | Ver mensaje recibido | Ambos |
+| Pause | Pedir pausa | Ambos |
+| [Juegos] | 14 juegos diferentes | Ambos |
+| End | Fin del juego | Ambos |
 
 ## Estado actual del desarrollo
 
@@ -117,19 +150,34 @@ vinculo-app/
 - [x] Tailwind CSS configurado
 - [x] Componentes base (Button, Input, Card)
 - [x] Todas las pantallas implementadas
-- [x] Flujo completo funcional (simulado)
-- [x] Gestos de recibido
+- [x] Flujo completo funcional
 - [x] Pausa segura
 - [x] Modo asíncrono (dejar mensaje)
-- [ ] **Supabase** - Pendiente configurar
-- [ ] **Deploy en Netlify** - Pendiente
+- [x] Supabase Realtime para sincronización
+- [x] Deploy en GitHub Pages
+- [x] PWA configurada
+- [x] Lazy loading de juegos (code splitting)
+- [x] Nuevo flujo simplificado (ShareAndInvite, GameSelect, WaitingForGame)
+- [x] Persistencia de sesión en localStorage
 
-## Próximos pasos
+## Juegos implementados
 
-1. Configurar Supabase (crear proyecto, tablas)
-2. Conectar sala real con código persistente
-3. Sincronización en tiempo real
-4. Deploy en Netlify
+| ID | Nombre | Descripción |
+|----|--------|-------------|
+| cards | Cartas | Preguntas para conocerse mejor |
+| wouldyourather | ¿Qué prefieres? | Dilemas divertidos |
+| quiz | Quiz | Preguntas sobre la pareja |
+| draw | Dibuja | Dibujar y adivinar |
+| adventure | Aventura | Historia interactiva |
+| mirror | Espejo | Reflexiones mutuas |
+| timeline | Nuestra Historia | Recuerdos compartidos |
+| timecards | Cartas del Tiempo | Pasado, presente, futuro |
+| calm | Momento Calma | Respiración guiada |
+| lovephrases | Te quiero porque... | Frases de amor |
+| randomplan | Plan Random | Generador de planes |
+| sillychallenges | Retos | Retos divertidos |
+| absurdphrases | Completa la Frase | Frases absurdas |
+| spinwheel | Gira y... | Ruleta sensual con niveles de intensidad |
 
 ## Comandos útiles
 
@@ -138,12 +186,42 @@ npm run dev       # Desarrollo local (http://localhost:5173)
 npm run build     # Build para producción
 ```
 
-## Variables de entorno necesarias
+---
 
-```
-VITE_SUPABASE_URL=tu_url_de_supabase
-VITE_SUPABASE_ANON_KEY=tu_anon_key
-```
+## URL de producción y sistema de invitación
+
+**URL de producción**: `https://cheatmealsistas-beep.github.io/vincula2/`
+
+**Sistema de códigos de sala**:
+- Los códigos se generan dinámicamente al crear una sala (ej: `LUNA42`, `SOL87`, `MAR15`)
+- Formato: palabra memorable + número de 2 dígitos
+- Palabras posibles: LUNA, SOL, MAR, CIELO, RIO, LUZ, PAZ, AIRE
+
+**Compartir link de invitación**:
+- En `WaitingRoom.tsx` hay un botón "Enviar link a tu pareja"
+- El link tiene formato: `https://cheatmealsistas-beep.github.io/vincula2/?code=LUNA42`
+- Usa Web Share API en móvil (abre menú nativo de compartir)
+- En escritorio copia al portapapeles
+- El parámetro `?code=` se lee en `App.tsx` (líneas 81-89) y auto-une a la sala
+
+**Importante sobre URLs en GitHub Pages**:
+- GitHub Pages solo sirve archivos estáticos, no hay servidor
+- Las query params (`?code=X`) SÍ funcionan porque la URL base siempre es `/vincula2/`
+- No usar rutas con paths (ej: `/vincula2/room/LUNA42`) porque dan 404
+
+---
+
+## Principios de copys/UX
+
+**Lenguaje inclusivo**:
+- Usar siempre "tu pareja" (neutro, sin género)
+- No asumir orientación sexual ni estructura familiar
+- Evitar "sala" y términos técnicos - usar "espacio", "código"
+
+**Copys cálidos**:
+- Estados de espera: "Tu pareja está pensando..." en vez de "Esperando..."
+- Botones de fin: "¡Listo!", "¡Qué aventura!" en vez de "Terminar"
+- Salir: "Hasta luego" en vez de "Salir de la sala"
 
 ---
 

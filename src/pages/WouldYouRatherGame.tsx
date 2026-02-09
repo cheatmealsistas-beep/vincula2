@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../components';
 import { WouldYouRatherIcon } from '../components/icons/GameIcons';
 import type { WouldYouRatherCard } from '../data/wouldyourather';
+import { celebrateMatch, triggerOops } from '../utils/celebrations';
 
 interface WouldYouRatherGameProps {
   cards: WouldYouRatherCard[];
@@ -27,13 +28,29 @@ export function WouldYouRatherGame({
   onFinish,
 }: WouldYouRatherGameProps) {
   const [selectedOption, setSelectedOption] = useState<'A' | 'B' | null>(null);
+  const [oopsData, setOopsData] = useState<{ emoji: string; message: string } | null>(null);
   const currentCard = cards[currentRound - 1];
   const isLastRound = currentRound === totalRounds;
+
+  // Animaciones cuando se revelan las respuestas
+  useEffect(() => {
+    if (bothRevealed && myChoice && partnerChoice) {
+      if (myChoice === partnerChoice) {
+        celebrateMatch();
+        setOopsData(null);
+      } else {
+        setOopsData(triggerOops());
+      }
+    }
+  }, [bothRevealed, myChoice, partnerChoice]);
 
   if (!currentCard) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
-        <p>Cargando...</p>
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-[var(--color-coral)] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-[var(--color-text)]">Preparando dilemas...</p>
+        </div>
       </div>
     );
   }
@@ -52,6 +69,7 @@ export function WouldYouRatherGame({
 
   const handleNext = () => {
     setSelectedOption(null);
+    setOopsData(null);
     if (isLastRound) {
       onFinish();
     } else {
@@ -182,21 +200,22 @@ export function WouldYouRatherGame({
       {/* Feedback de coincidencia */}
       {bothRevealed && (
         <div className={`
-          text-center py-4 px-6 rounded-2xl mb-4
+          text-center py-4 px-6 rounded-2xl mb-4 animate-fade-up
           ${matched ? 'bg-green-100' : 'bg-yellow-50'}
+          ${!matched ? 'animate-shake' : ''}
         `}>
           {matched ? (
             <>
-              <span className="text-3xl">🎉</span>
+              <span className="text-3xl">❤️</span>
               <p className="font-semibold text-green-700 mt-1">
                 ¡Pensáis igual!
               </p>
             </>
           ) : (
             <>
-              <span className="text-3xl">🤷</span>
+              <span className="text-3xl">{oopsData?.emoji || '🙈'}</span>
               <p className="font-semibold text-yellow-700 mt-1">
-                Diferentes gustos, ¡eso está bien!
+                {oopsData?.message || '¡Ups! Pensáis diferente'}
               </p>
             </>
           )}
@@ -216,12 +235,12 @@ export function WouldYouRatherGame({
           <div className="text-center py-4">
             <div className="w-6 h-6 border-3 border-[var(--color-coral)] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
             <p className="text-[var(--color-text)] opacity-70">
-              Esperando a tu pareja...
+              Tu pareja está pensando...
             </p>
           </div>
         ) : (
           <Button onClick={handleNext}>
-            {isLastRound ? 'Ver resumen' : 'Siguiente dilema'}
+            {isLastRound ? '¡Listo!' : 'Siguiente dilema'}
           </Button>
         )}
       </div>

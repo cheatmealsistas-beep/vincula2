@@ -63,7 +63,7 @@ export function InviteMessage({
         {/* Botones */}
         <div className="space-y-3">
           <Button onClick={handleContinue}>
-            {message.trim() ? 'Crear sala con mensaje' : 'Crear sala'}
+            {message.trim() ? 'Continuar con mensaje' : 'Continuar'}
           </Button>
 
           {message.trim() && (

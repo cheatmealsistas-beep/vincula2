@@ -113,7 +113,7 @@ export function DrawGuessGame({
               <div className="text-center py-8">
                 <div className="w-6 h-6 border-3 border-[var(--color-coral)] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
                 <p className="text-[var(--color-text)] opacity-70">
-                  Esperando a que adivine...
+                  Tu pareja está adivinando...
                 </p>
               </div>
             )}
@@ -194,7 +194,7 @@ export function DrawGuessGame({
       {roundComplete && (
         <div className="mt-6">
           <Button onClick={handleNext}>
-            {isLastRound ? 'Ver resumen' : 'Siguiente ronda'}
+            {isLastRound ? '¡Listo!' : 'Siguiente ronda'}
           </Button>
         </div>
       )}

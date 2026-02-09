@@ -53,7 +53,7 @@ export function useCalm(roomId: string | null, myPlayerNumber: 1 | 2 | null) {
           table: 'rooms',
           filter: `id=eq.${roomId}`,
         },
-        (payload) => {
+        (payload: any) => {
           const newRoom = payload.new as { calm_state?: Partial<CalmState> };
           if (newRoom.calm_state) {
             setState(prev => ({

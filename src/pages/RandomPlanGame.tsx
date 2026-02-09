@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../components';
 import type { HalfPlanResult, FullPlanResult } from '../data/randomplan';
 import { getCategoryById } from '../data/randomplan';
+import { celebrateFinish } from '../utils/celebrations';
 
 interface RandomPlanGameProps {
   myHalfPlan: HalfPlanResult | null;
@@ -11,8 +12,12 @@ interface RandomPlanGameProps {
   partnerHasRolled: boolean;
   bothRevealed: boolean;
   myCategories: readonly string[];
+  myLocked: boolean;
+  partnerLocked: boolean;
+  canReroll: boolean;
   onRollDice: () => void;
-  onReroll: () => void;
+  onRerollOption: (optionNumber: 1 | 2) => void;
+  onLock: () => void;
   onFinish: () => void;
 }
 
@@ -30,14 +35,14 @@ function HalfPlanCard({
   title,
   highlight = false,
   showReroll = false,
-  onReroll,
+  onRerollOption,
 }: {
   halfPlan: HalfPlanResult;
   categories: readonly string[];
   title: string;
   highlight?: boolean;
   showReroll?: boolean;
-  onReroll?: () => void;
+  onRerollOption?: (optionNumber: 1 | 2) => void;
 }) {
   const cat1 = getCategoryById(categories[0]);
   const cat2 = getCategoryById(categories[1]);
@@ -50,21 +55,29 @@ function HalfPlanCard({
           <span className="text-3xl block mb-1">{halfPlan.option1.emoji}</span>
           <p className="text-xs text-[var(--color-text)] opacity-50">{cat1?.name}</p>
           <p className="text-sm font-medium text-[var(--color-text)]">{halfPlan.option1.text}</p>
+          {showReroll && onRerollOption && (
+            <button
+              onClick={() => onRerollOption(1)}
+              className="mt-2 text-xs text-[var(--color-coral)] font-medium py-1 px-2 hover:bg-[var(--color-coral)]/10 rounded-lg transition-colors"
+            >
+              🎲 Cambiar
+            </button>
+          )}
         </div>
         <div className="text-center p-3 bg-white/50 rounded-xl">
           <span className="text-3xl block mb-1">{halfPlan.option2.emoji}</span>
           <p className="text-xs text-[var(--color-text)] opacity-50">{cat2?.name}</p>
           <p className="text-sm font-medium text-[var(--color-text)]">{halfPlan.option2.text}</p>
+          {showReroll && onRerollOption && (
+            <button
+              onClick={() => onRerollOption(2)}
+              className="mt-2 text-xs text-[var(--color-coral)] font-medium py-1 px-2 hover:bg-[var(--color-coral)]/10 rounded-lg transition-colors"
+            >
+              🎲 Cambiar
+            </button>
+          )}
         </div>
       </div>
-      {showReroll && onReroll && (
-        <button
-          onClick={onReroll}
-          className="mt-3 w-full text-center text-sm text-[var(--color-coral)] font-medium py-2 hover:bg-[var(--color-coral)]/10 rounded-xl transition-colors"
-        >
-          🎲 Volver a tirar
-        </button>
-      )}
     </div>
   );
 }
@@ -120,11 +133,22 @@ export function RandomPlanGame({
   partnerHasRolled,
   bothRevealed,
   myCategories,
+  myLocked,
+  partnerLocked,
+  canReroll,
   onRollDice,
-  onReroll,
+  onRerollOption,
+  onLock,
   onFinish,
 }: RandomPlanGameProps) {
   const [rolling, setRolling] = useState(false);
+
+  // Confetti cuando se revela el plan completo
+  useEffect(() => {
+    if (bothRevealed && fullPlan) {
+      celebrateFinish();
+    }
+  }, [bothRevealed, fullPlan]);
 
   const handleRoll = () => {
     setRolling(true);
@@ -132,14 +156,6 @@ export function RandomPlanGame({
       setRolling(false);
       onRollDice();
     }, 1000);
-  };
-
-  const handleReroll = () => {
-    setRolling(true);
-    setTimeout(() => {
-      setRolling(false);
-      onReroll();
-    }, 800);
   };
 
   // Nombres de las categorías que me tocan
@@ -184,19 +200,70 @@ export function RandomPlanGame({
             <HalfPlanCard
               halfPlan={myHalfPlan!}
               categories={myCategories}
-              title="Tu aportación al plan"
-              showReroll={!partnerHasRolled}
-              onReroll={handleReroll}
+              title={myLocked ? "Tu aportación (bloqueada)" : "Tu aportación al plan"}
+              highlight={myLocked}
+              showReroll={canReroll}
+              onRerollOption={onRerollOption}
             />
+
+            {/* Botón para bloquear mi parte */}
+            {hasRolled && !myLocked && (
+              <div className="mt-4">
+                <Button onClick={onLock}>
+                  {partnerLocked ? '¡Listo! Ver plan' : 'Me gusta, ¡bloquear!'}
+                </Button>
+                <p className="text-xs text-center text-[var(--color-text)] opacity-50 mt-2">
+                  {partnerLocked
+                    ? 'Tu pareja ya aceptó. Bloquea para ver el plan completo.'
+                    : 'Puedes seguir tirando hasta que estés contento'}
+                </p>
+              </div>
+            )}
+
+            {/* Estado de espera */}
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center py-8">
-                <div className="w-6 h-6 border-3 border-[var(--color-coral)] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                <p className="text-[var(--color-text)] opacity-70">
-                  Esperando a que tu pareja tire...
-                </p>
-                <p className="text-xs text-[var(--color-text)] opacity-50 mt-2">
-                  Le toca elegir la otra mitad
-                </p>
+                {myLocked && !partnerHasRolled ? (
+                  <>
+                    <div className="text-3xl mb-3">🔒</div>
+                    <p className="text-[var(--color-text)] opacity-70">
+                      Tu parte está bloqueada
+                    </p>
+                    <p className="text-xs text-[var(--color-text)] opacity-50 mt-2">
+                      Tu pareja está tirando...
+                    </p>
+                  </>
+                ) : myLocked && partnerHasRolled && !partnerLocked ? (
+                  <>
+                    <div className="w-6 h-6 border-3 border-[var(--color-coral)] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                    <p className="text-[var(--color-text)] opacity-70">
+                      Tu pareja ya tiró
+                    </p>
+                    <p className="text-xs text-[var(--color-text)] opacity-50 mt-2">
+                      Tu pareja está decidiendo...
+                    </p>
+                  </>
+                ) : !myLocked && partnerHasRolled ? (
+                  <>
+                    <div className="text-3xl mb-3">✨</div>
+                    <p className="text-[var(--color-text)] opacity-70">
+                      {partnerLocked ? 'Tu pareja ya bloqueó su parte' : 'Tu pareja ya tiró sus dados'}
+                    </p>
+                    <p className="text-xs text-[var(--color-text)] opacity-50 mt-2">
+                      {partnerLocked ? 'Bloquea la tuya para ver el plan completo' : 'Cada uno puede seguir tirando hasta estar contento'}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-6 h-6 border-3 border-[var(--color-coral)] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                    <p className="text-[var(--color-text)] opacity-70">
+                      Le toca a tu pareja...
+                    </p>
+                    <p className="text-xs text-[var(--color-text)] opacity-50 mt-2">
+                      Le toca elegir la otra mitad
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -222,15 +289,6 @@ export function RandomPlanGame({
               </div>
             </div>
 
-            {/* Opción de volver a tirar ambos */}
-            <div className="text-center pt-2">
-              <button
-                onClick={onReroll}
-                className="text-sm text-[var(--color-text)] opacity-60 hover:opacity-100 py-2 px-4"
-              >
-                🔄 Volver a tirar mi parte
-              </button>
-            </div>
           </div>
         )}
       </div>

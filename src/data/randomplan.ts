@@ -86,20 +86,35 @@ export interface FullPlanResult {
   extra: PlanOption;
 }
 
+export function getRandomOptionForCategory(categoryId: string): PlanOption {
+  const category = PLAN_CATEGORIES.find(c => c.id === categoryId);
+  if (!category) throw new Error(`Category ${categoryId} not found`);
+  const randomIndex = Math.floor(Math.random() * category.options.length);
+  return category.options[randomIndex];
+}
+
 export function rollHalfPlan(playerNumber: 1 | 2): HalfPlanResult {
   const categories = playerNumber === 1 ? PLAYER1_CATEGORIES : PLAYER2_CATEGORIES;
 
-  const getRandomOption = (categoryId: string): PlanOption => {
-    const category = PLAN_CATEGORIES.find(c => c.id === categoryId);
-    if (!category) throw new Error(`Category ${categoryId} not found`);
-    const randomIndex = Math.floor(Math.random() * category.options.length);
-    return category.options[randomIndex];
-  };
-
   return {
-    option1: getRandomOption(categories[0]),
-    option2: getRandomOption(categories[1]),
+    option1: getRandomOptionForCategory(categories[0]),
+    option2: getRandomOptionForCategory(categories[1]),
   };
+}
+
+// Reroll solo una de las dos opciones (1 o 2)
+export function rerollSingleOption(
+  currentPlan: HalfPlanResult,
+  playerNumber: 1 | 2,
+  optionNumber: 1 | 2
+): HalfPlanResult {
+  const categories = playerNumber === 1 ? PLAYER1_CATEGORIES : PLAYER2_CATEGORIES;
+  const categoryToReroll = optionNumber === 1 ? categories[0] : categories[1];
+  const newOption = getRandomOptionForCategory(categoryToReroll);
+
+  return optionNumber === 1
+    ? { option1: newOption, option2: currentPlan.option2 }
+    : { option1: currentPlan.option1, option2: newOption };
 }
 
 export function getPlanOptionById(id: string): PlanOption | undefined {

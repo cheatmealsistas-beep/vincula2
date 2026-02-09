@@ -2,7 +2,7 @@
 
 export type RoomStatus = 'waiting' | 'playing' | 'paused' | 'finished';
 
-export type CardType = 'express' | 'listen' | 'repair' | 'pause';
+export type CardType = 'express' | 'listen' | 'repair' | 'mirror' | 'pause';
 
 export interface Room {
   id: string;
@@ -27,6 +27,8 @@ export interface Card {
   type: CardType;
   prompt: string;
   placeholder: string;
+  // Si es true, la pregunta es "sobre tu pareja" y se alterna quién es el sujeto
+  aboutPartner?: boolean;
 }
 
 export interface CardPlayed {

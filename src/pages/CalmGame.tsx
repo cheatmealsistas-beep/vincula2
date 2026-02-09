@@ -120,7 +120,7 @@ export function CalmGame({
               onClick={onFinish}
               className="w-full py-3 text-[var(--color-text)]/60 text-sm"
             >
-              Volver a la sala
+              Volver
             </button>
           </div>
         )}
@@ -230,7 +230,7 @@ export function CalmGame({
             onClick={onFinish}
             className="w-full py-3 text-[var(--color-text)]/60 text-sm"
           >
-            Volver a la sala
+            Volver
           </button>
         </div>
       )}

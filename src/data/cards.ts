@@ -1,10 +1,10 @@
 import type { Card } from '../types';
 
-// Mazo de cartas para el MVP
+// Mazo de cartas fusionado: Cartas originales + Espejo del Alma
 // Siguiendo los valores: cariño, honestidad, apoyo, sinceridad, humor
 
 export const CARDS: Card[] = [
-  // Cartas de Expresar - para decir lo que necesitas
+  // === EXPRESAR - Para decir lo que necesitas ===
   {
     id: 'express-1',
     type: 'express',
@@ -23,8 +23,20 @@ export const CARDS: Card[] = [
     prompt: 'Algo que no he dicho es que...',
     placeholder: 'a veces me siento...',
   },
+  {
+    id: 'express-4',
+    type: 'express',
+    prompt: 'Últimamente me siento...',
+    placeholder: 'agotado/a, feliz, confundido/a...',
+  },
+  {
+    id: 'express-5',
+    type: 'express',
+    prompt: 'Me cuesta decirte que...',
+    placeholder: 'necesito más espacio, te echo de menos...',
+  },
 
-  // Cartas de Escuchar - para observar al otro
+  // === ESCUCHAR - Para observar al otro ===
   {
     id: 'listen-1',
     type: 'listen',
@@ -43,8 +55,14 @@ export const CARDS: Card[] = [
     prompt: 'Me gusta cuando tú...',
     placeholder: 'me miras así, cocinas, ríes...',
   },
+  {
+    id: 'listen-4',
+    type: 'listen',
+    prompt: 'Te noto diferente cuando...',
+    placeholder: 'hablas de trabajo, ves a tu familia...',
+  },
 
-  // Cartas de Reparar - para cuidar mejor
+  // === REPARAR - Para cuidar mejor ===
   {
     id: 'repair-1',
     type: 'repair',
@@ -63,23 +81,118 @@ export const CARDS: Card[] = [
     prompt: 'Gracias por...',
     placeholder: 'tu paciencia, estar ahí, entenderme...',
   },
+  {
+    id: 'repair-4',
+    type: 'repair',
+    prompt: 'Perdona si a veces...',
+    placeholder: 'no te escucho bien, me cierro...',
+  },
+
+  // === ESPEJO - Sobre tu pareja (ambos responden sobre la misma persona) ===
+  {
+    id: 'mirror-1',
+    type: 'mirror',
+    prompt: 'Tu mayor fortaleza es...',
+    placeholder: 'tu paciencia, tu creatividad, tu corazón...',
+    aboutPartner: true,
+  },
+  {
+    id: 'mirror-2',
+    type: 'mirror',
+    prompt: 'Lo que más admiro de ti es...',
+    placeholder: 'cómo enfrentas los problemas, tu bondad...',
+    aboutPartner: true,
+  },
+  {
+    id: 'mirror-3',
+    type: 'mirror',
+    prompt: 'Creo que secretamente sueñas con...',
+    placeholder: 'viajar, tener un negocio, vivir en la playa...',
+    aboutPartner: true,
+  },
+  {
+    id: 'mirror-4',
+    type: 'mirror',
+    prompt: 'Tu manía más adorable es...',
+    placeholder: 'cómo ordenas todo, tus rituales...',
+    aboutPartner: true,
+  },
+  {
+    id: 'mirror-5',
+    type: 'mirror',
+    prompt: 'Me encanta cuando haces eso de...',
+    placeholder: 'cantar bajito, acariciarme el pelo...',
+    aboutPartner: true,
+  },
+  {
+    id: 'mirror-6',
+    type: 'mirror',
+    prompt: 'Creo que a veces te preocupa...',
+    placeholder: 'no ser suficiente, el futuro...',
+    aboutPartner: true,
+  },
+  {
+    id: 'mirror-7',
+    type: 'mirror',
+    prompt: 'Contigo me siento...',
+    placeholder: 'en casa, seguro/a, libre...',
+    aboutPartner: false, // Esta es sobre uno mismo
+  },
+  {
+    id: 'mirror-8',
+    type: 'mirror',
+    prompt: 'Me enamoré de ti porque...',
+    placeholder: 'tu risa, cómo me miras, tu forma de ser...',
+    aboutPartner: true,
+  },
 ];
 
 // Función para obtener cartas aleatorias para una partida
-export function getRandomCards(count: number = 3): Card[] {
+export function getRandomCards(count: number = 5): Card[] {
   const shuffled = [...CARDS].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, count);
 }
 
-// Función para obtener una carta de cada tipo
-export function getBalancedCards(): Card[] {
+// Función para obtener cartas balanceadas (una de cada tipo)
+export function getBalancedCards(count: number = 5): Card[] {
   const express = CARDS.filter(c => c.type === 'express');
   const listen = CARDS.filter(c => c.type === 'listen');
   const repair = CARDS.filter(c => c.type === 'repair');
+  const mirror = CARDS.filter(c => c.type === 'mirror');
 
-  return [
-    express[Math.floor(Math.random() * express.length)],
-    listen[Math.floor(Math.random() * listen.length)],
-    repair[Math.floor(Math.random() * repair.length)],
-  ];
+  const allTypes = [express, listen, repair, mirror];
+  const selected: Card[] = [];
+
+  // Rotar por tipos para tener variedad
+  let typeIndex = 0;
+  while (selected.length < count) {
+    const typeCards = allTypes[typeIndex % allTypes.length];
+    const available = typeCards.filter(c => !selected.includes(c));
+    if (available.length > 0) {
+      const random = available[Math.floor(Math.random() * available.length)];
+      selected.push(random);
+    }
+    typeIndex++;
+    // Safety check para evitar bucle infinito
+    if (typeIndex > count * 4) break;
+  }
+
+  return selected.sort(() => Math.random() - 0.5);
 }
+
+// Colores por tipo de carta
+export const CARD_TYPE_COLORS = {
+  express: '#FFDAB9', // Peach
+  listen: '#B2E0D6',  // Mint
+  repair: '#E6E0F8',  // Lavender
+  mirror: '#FFE4EC',  // Pink suave
+  pause: '#E8E4DF',   // Gris cálido
+} as const;
+
+export const CARD_TYPE_LABELS = {
+  express: 'Expresar',
+  listen: 'Escuchar',
+  repair: 'Reparar',
+  mirror: 'Espejo',
+  pause: 'Pausa',
+} as const;

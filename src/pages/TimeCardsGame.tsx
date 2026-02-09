@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../components';
 import { TimeCardsIcon } from '../components/icons/GameIcons';
 import { TIMEFRAME_COLORS, TIMEFRAME_LABELS, type TimeCard } from '../data/timecards';
+import { celebrateMatch } from '../utils/celebrations';
 
 interface TimeCardsGameProps {
   cards: TimeCard[];
@@ -33,7 +34,7 @@ export function TimeCardsGame({
   if (!currentCard) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
-        <p>Cargando...</p>
+        <p>Un momento...</p>
       </div>
     );
   }
@@ -53,6 +54,13 @@ export function TimeCardsGame({
       onNextRound();
     }
   };
+
+  // Animación de corazones cuando se revelan las respuestas
+  useEffect(() => {
+    if (bothRevealed) {
+      celebrateMatch();
+    }
+  }, [bothRevealed]);
 
   const timeframeColor = TIMEFRAME_COLORS[currentCard.timeframe];
   const timeframeLabel = TIMEFRAME_LABELS[currentCard.timeframe];
@@ -139,7 +147,7 @@ export function TimeCardsGame({
               style={{ borderColor: timeframeColor }}
             />
             <p className="text-[var(--color-text)] opacity-70">
-              Esperando a tu pareja...
+              Tu pareja está pensando...
             </p>
             <div
               className="mt-4 rounded-2xl p-4"
@@ -186,7 +194,7 @@ export function TimeCardsGame({
       {bothRevealed && (
         <div className="mt-6">
           <Button onClick={handleNext}>
-            {isLastRound ? 'Ver resumen' : 'Siguiente carta'}
+            {isLastRound ? '¡Listo!' : 'Siguiente carta'}
           </Button>
         </div>
       )}

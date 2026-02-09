@@ -18,8 +18,9 @@ interface UseRoomReturn {
   createRoom: (code: string, gameType?: string, inviteMessage?: string) => Promise<boolean>;
   joinRoom: (code: string) => Promise<boolean>;
   leaveRoom: () => Promise<void>;
+  setGameType: (gameType: string) => Promise<void>;
   sendMessage: (type: string, prompt: string, content: string) => Promise<void>;
-  markMessageRead: (messageId: string, gesture?: string) => Promise<void>;
+  markMessageRead: (messageId: string) => Promise<void>;
   setPause: (message?: string, until?: string) => Promise<void>;
   resumeFromPause: () => Promise<void>;
   updatePresence: () => Promise<void>;
@@ -41,16 +42,20 @@ export function useRoom(): UseRoomReturn {
     setError(null);
 
     try {
-      // Crear sala
+      console.log('[useRoom] Creando sala:', code, 'tipo:', gameType);
+
+      // Crear sala (sin game_type hasta que el host elija)
       const { data: roomData, error: roomError } = await supabase
         .from('rooms')
         .insert({
           code,
-          game_type: gameType || 'cards',
+          game_type: gameType || null,
           invite_message: inviteMessage || null,
         })
         .select()
         .single();
+
+      console.log('[useRoom] Sala creada:', { roomData, roomError });
 
       if (roomError) throw roomError;
 
@@ -85,6 +90,8 @@ export function useRoom(): UseRoomReturn {
     setError(null);
 
     try {
+      console.log('[useRoom] Intentando unirse a sala:', code.toUpperCase());
+
       // Buscar sala
       const { data: roomData, error: roomError } = await supabase
         .from('rooms')
@@ -92,7 +99,10 @@ export function useRoom(): UseRoomReturn {
         .eq('code', code.toUpperCase())
         .single();
 
+      console.log('[useRoom] Resultado búsqueda:', { roomData, roomError });
+
       if (roomError || !roomData) {
+        console.error('[useRoom] joinRoom error:', roomError, 'data:', roomData);
         setError('No existe una sala con ese código');
         setLoading(false);
         return false;
@@ -105,15 +115,25 @@ export function useRoom(): UseRoomReturn {
         .eq('room_id', roomData.id);
 
       const existingPlayers = players || [];
+      console.log('[useRoom] Jugadores existentes:', existingPlayers);
 
-      if (existingPlayers.length >= 2) {
-        setError('La sala ya está llena');
-        setLoading(false);
-        return false;
+      // Solo mantener al jugador 1 (host) si existe
+      // Cualquier jugador 2 antiguo se elimina para permitir nuevo invitado
+      const player1 = existingPlayers.find(p => p.player_number === 1);
+      const player2s = existingPlayers.filter(p => p.player_number === 2);
+
+      // Eliminar jugadores 2 antiguos (para permitir reconexión)
+      if (player2s.length > 0) {
+        console.log('[useRoom] Limpiando jugadores 2 antiguos:', player2s.map(p => p.id));
+        await supabase
+          .from('players')
+          .delete()
+          .in('id', player2s.map(p => p.id));
       }
 
-      // Determinar número de jugador
-      const playerNumber = existingPlayers.length === 0 ? 1 : 2;
+      // El invitado siempre es jugador 2 si hay host
+      const playerNumber = player1 ? 2 : 1;
+      console.log('[useRoom] Asignando player_number:', playerNumber);
 
       // Crear jugador
       const { data: playerData, error: playerError } = await supabase
@@ -168,13 +188,12 @@ export function useRoom(): UseRoomReturn {
     [room, myPlayerNumber]
   );
 
-  // Marcar mensaje como leído (con gesto opcional)
-  const markMessageRead = useCallback(async (messageId: string, gesture?: string) => {
+  // Marcar mensaje como leído
+  const markMessageRead = useCallback(async (messageId: string) => {
     await supabase
       .from('messages')
       .update({
         read_at: new Date().toISOString(),
-        gesture: gesture || null,
       })
       .eq('id', messageId);
 
@@ -212,6 +231,25 @@ export function useRoom(): UseRoomReturn {
       .eq('id', room.id);
   }, [room]);
 
+  // Establecer tipo de juego
+  const setGameType = useCallback(async (gameType: string) => {
+    if (!room) return;
+
+    console.log('[useRoom] Actualizando game_type a:', gameType);
+
+    const { error } = await supabase
+      .from('rooms')
+      .update({ game_type: gameType })
+      .eq('id', room.id);
+
+    if (error) {
+      console.error('[useRoom] Error al actualizar game_type:', error);
+    } else {
+      // Actualizar estado local inmediatamente
+      setRoom(prev => prev ? { ...prev, game_type: gameType } : null);
+    }
+  }, [room]);
+
   // Actualizar presencia
   const updatePresence = useCallback(async () => {
     if (!myPlayerId) return;
@@ -235,7 +273,8 @@ export function useRoom(): UseRoomReturn {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${room.id}` },
-        (payload) => {
+        (payload: any) => {
+          console.log('[useRoom] Cambio en sala recibido:', payload);
           if (payload.new) {
             setRoom(payload.new as Room);
           }
@@ -244,7 +283,7 @@ export function useRoom(): UseRoomReturn {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'players', filter: `room_id=eq.${room.id}` },
-        (payload) => {
+        (payload: any) => {
           const player = payload.new as Player;
           if (player && player.player_number !== myPlayerNumber) {
             setPartnerOnline(player.is_online);
@@ -264,7 +303,7 @@ export function useRoom(): UseRoomReturn {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${room.id}` },
-        (payload) => {
+        (payload: any) => {
           const message = payload.new as Message;
           if (message.from_player !== myPlayerNumber && !message.read_at) {
             setPendingMessage(message);
@@ -338,6 +377,7 @@ export function useRoom(): UseRoomReturn {
     createRoom,
     joinRoom,
     leaveRoom,
+    setGameType,
     sendMessage,
     markMessageRead,
     setPause,

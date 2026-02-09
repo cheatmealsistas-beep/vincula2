@@ -1,6 +1,60 @@
 import { useState } from 'react';
 import { Button, GameIcon } from '../components';
 
+function ShareButton({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  const shareUrl = `https://cheatmealsistas-beep.github.io/vincula2/?code=${code}`;
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Vincula2',
+          text: `¡Juega conmigo! Entra con el código ${code}`,
+          url: shareUrl,
+        });
+        return;
+      } catch {
+        // Usuario canceló
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      const textArea = document.createElement('textarea');
+      textArea.value = shareUrl;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleShare}
+      className="mt-4 py-3 px-5 bg-[var(--color-lavender)] rounded-xl text-[var(--color-text)] font-medium flex items-center justify-center gap-2 active:scale-95 transition-transform"
+    >
+      {copied ? (
+        <>
+          <span>✓</span>
+          <span>¡Link copiado!</span>
+        </>
+      ) : (
+        <>
+          <span>📤</span>
+          <span>Enviar link a tu pareja</span>
+        </>
+      )}
+    </button>
+  );
+}
+
 interface RoomProps {
   code: string;
   partnerOnline: boolean;
@@ -16,7 +70,6 @@ interface RoomProps {
   onPause: () => void;
   onResume: () => void;
   onLeave: () => void;
-  onNeedCalm?: () => void;
 }
 
 export function Room({
@@ -34,51 +87,42 @@ export function Room({
   onPause,
   onResume,
   onLeave,
-  onNeedCalm,
 }: RoomProps) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopyLink = async () => {
-    const link = `${window.location.origin}?code=${code}`;
-    await navigator.clipboard.writeText(link);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   return (
     <div className="min-h-screen flex flex-col px-6 py-8 animate-fade-up">
       {/* Cabecera */}
       <div className="text-center mb-8">
         <p className="text-sm text-[var(--color-text)] opacity-50 mb-1">
-          Vuestra sala
+          Vuestro espacio
         </p>
         <h1 className="text-2xl font-bold font-mono tracking-wider text-[var(--color-text)]">
           {code}
         </h1>
 
-        {/* Botón copiar enlace */}
-        <button
-          onClick={handleCopyLink}
-          className="mt-2 text-sm text-[var(--color-coral)] hover:underline"
-        >
-          {copied ? '¡Enlace copiado!' : 'Copiar enlace de invitación'}
-        </button>
-
         {/* Estado de presencia */}
-        <div className="mt-3 flex items-center justify-center gap-2">
+        <div className={`mt-3 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full ${
+          partnerOnline ? 'bg-green-100' : 'bg-gray-100'
+        }`}>
           <span
-            className={`w-2.5 h-2.5 rounded-full ${
-              partnerOnline ? 'bg-green-400 animate-pulse-soft' : 'bg-gray-300'
+            className={`w-3 h-3 rounded-full ${
+              partnerOnline ? 'bg-green-500 animate-pulse-soft' : 'bg-gray-400'
             }`}
           />
-          <span className="text-sm text-[var(--color-text)] opacity-70">
+          <span className={`text-sm font-medium ${
+            partnerOnline ? 'text-green-700' : 'text-gray-600'
+          }`}>
             {partnerOnline
               ? 'Tu pareja está aquí'
               : partnerLastSeen
               ? `Última vez: ${partnerLastSeen}`
-              : 'Esperando a tu pareja'}
+              : 'Tu pareja llegará pronto'}
           </span>
         </div>
+
+        {/* Botón compartir cuando la pareja no está */}
+        {!partnerOnline && !partnerLastSeen && (
+          <ShareButton code={code} />
+        )}
       </div>
 
       {/* Mensaje de pausa (si aplica) */}
@@ -124,38 +168,28 @@ export function Room({
             )}
 
             <Button variant="secondary" onClick={onLeaveMessage}>
-              Dejar algo para ti
+              Dejarle un mensaje
             </Button>
           </>
         )}
       </div>
 
       {/* Footer */}
-      <div className="mt-8 space-y-2">
-        {!isPaused && onNeedCalm && (
-          <button
-            onClick={onNeedCalm}
-            className="w-full py-3 flex items-center justify-center gap-2 text-[var(--color-text)] opacity-70 text-sm hover:opacity-90 transition-opacity"
-          >
-            <span>🌊</span>
-            <span>Necesito calma</span>
-          </button>
-        )}
-
+      <div className="mt-8 space-y-3">
         {!isPaused && (
           <button
             onClick={onPause}
-            className="w-full py-3 text-[var(--color-text)] opacity-60 text-sm hover:opacity-80 transition-opacity"
+            className="w-full py-3 px-4 text-[var(--color-text)] text-sm font-medium bg-white/50 rounded-xl border border-gray-200 hover:bg-white hover:border-gray-300 active:scale-[0.98] transition-all"
           >
-            Necesito un momento
+            ⏸️ Necesito un momento
           </button>
         )}
 
         <button
           onClick={onLeave}
-          className="w-full py-3 text-[var(--color-text)] opacity-50 text-xs hover:opacity-70 transition-opacity"
+          className="w-full py-3 px-4 text-gray-500 text-sm hover:text-gray-700 hover:underline transition-all"
         >
-          Salir de la sala
+          Hasta luego
         </button>
       </div>
     </div>

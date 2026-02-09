@@ -4,8 +4,36 @@ import { PixelCharacter, PixelScene, DialogBubble } from '../components/adventur
 import type { Adventure } from '../data/adventure';
 import { AVATARS } from '../data/adventure';
 import { getPixelCharacterInfo } from '../components/adventure/PixelCharacter';
+import { celebrateMatch, triggerOops, celebrateFinish } from '../utils/celebrations';
 
 type GamePhase = 'avatar-select' | 'scene' | 'voting' | 'minigame' | 'result';
+
+// Componente separado para el resultado final con animación
+function TreasureResult({ adventure, onFinish }: { adventure: Adventure; onFinish: () => void }) {
+  useEffect(() => {
+    celebrateFinish();
+  }, []);
+
+  return (
+    <div className="space-y-4">
+      <div
+        className="rounded-2xl p-6 text-center animate-fade-up"
+        style={{
+          background: `linear-gradient(135deg, ${adventure.palette.accent}40, ${adventure.palette.primary}40)`
+        }}
+      >
+        <span className="text-5xl block mb-2">🏆</span>
+        <p className="text-lg font-bold" style={{ color: adventure.palette.primary }}>
+          ¡Aventura completada!
+        </p>
+        <p className="text-sm opacity-70 mt-1">
+          Habéis vivido una experiencia única juntos
+        </p>
+      </div>
+      <Button onClick={onFinish}>¡Qué aventura!</Button>
+    </div>
+  );
+}
 
 interface AdventureGameProps {
   adventure: Adventure;
@@ -26,8 +54,8 @@ export function AdventureGame({
   adventure,
   myAvatarId,
   partnerAvatarId,
-  currentEventId: _currentEventId,
-  completedEventIds: _completedEventIds,
+  currentEventId,
+  completedEventIds,
   myVote,
   partnerVote,
   onSelectAvatar,
@@ -36,15 +64,17 @@ export function AdventureGame({
   onCompleteEvent,
   onFinish,
 }: AdventureGameProps) {
-  // Las props _currentEventId y _completedEventIds se mantienen para compatibilidad con el hook
-  void _currentEventId;
-  void _completedEventIds;
   const [phase, setPhase] = useState<GamePhase>('avatar-select');
-  const [currentEventIndex, setCurrentEventIndex] = useState(0);
   const [tapCount, setTapCount] = useState(0);
   const [minigameTimer, setMinigameTimer] = useState(5);
   const [showResult, setShowResult] = useState(false);
   const [resultText, setResultText] = useState('');
+  const [oopsData, setOopsData] = useState<{ emoji: string; message: string } | null>(null);
+
+  // Calcular el índice actual basado en currentEventId sincronizado
+  const currentEventIndex = currentEventId
+    ? adventure.events.findIndex(e => e.id === currentEventId)
+    : completedEventIds.length;
 
   const currentEvent = adventure.events[currentEventIndex];
   const bothHaveAvatars = myAvatarId && partnerAvatarId;
@@ -62,7 +92,19 @@ export function AdventureGame({
     }
   }, [bothHaveAvatars, phase]);
 
-  // Cuando ambos votan, mostrar resultado
+  // Sincronizar fase cuando el partner avanza a un nuevo evento
+  useEffect(() => {
+    if (currentEventId && phase !== 'avatar-select') {
+      // Reset del estado local cuando cambia el evento
+      setPhase('scene');
+      setShowResult(false);
+      setResultText('');
+      setTapCount(0);
+      setMinigameTimer(5);
+    }
+  }, [currentEventId]);
+
+  // Cuando ambos votan, mostrar resultado con animación
   useEffect(() => {
     if (bothVoted && phase === 'voting') {
       // Buscar el resultado de la elección
@@ -70,10 +112,19 @@ export function AdventureGame({
       if (choice) {
         setResultText(choice.result);
       }
+
+      // Animación según si coinciden o no
+      if (votesMatch) {
+        celebrateMatch();
+        setOopsData(null);
+      } else {
+        setOopsData(triggerOops());
+      }
+
       setShowResult(true);
       setPhase('result');
     }
-  }, [bothVoted, phase]);
+  }, [bothVoted, phase, votesMatch]);
 
   // Timer del minijuego
   useEffect(() => {
@@ -96,7 +147,6 @@ export function AdventureGame({
       // Aventura completada
       onFinish();
     } else {
-      setCurrentEventIndex(nextIndex);
       onMoveToEvent(adventure.events[nextIndex].id);
       setPhase('scene');
       setShowResult(false);
@@ -177,7 +227,7 @@ export function AdventureGame({
         {myAvatarId && !partnerAvatarId && (
           <div className="text-center py-4">
             <div className="w-6 h-6 border-3 border-[var(--color-coral)] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-            <p className="text-sm text-[var(--color-text)] opacity-70">Esperando a tu pareja...</p>
+            <p className="text-sm text-[var(--color-text)] opacity-70">Tu pareja está pensando...</p>
           </div>
         )}
       </div>
@@ -268,7 +318,7 @@ export function AdventureGame({
               {myVote && !partnerVote && (
                 <div className="text-center py-4">
                   <div className="w-5 h-5 border-2 border-[var(--color-coral)] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                  <p className="text-sm opacity-70">Esperando a tu pareja...</p>
+                  <p className="text-sm opacity-70">Tu pareja está pensando...</p>
                 </div>
               )}
             </div>
@@ -277,9 +327,9 @@ export function AdventureGame({
           {/* CHOICE RESULT */}
           {currentEvent.type === 'choice' && showResult && (
             <div className="space-y-4">
-              <div className={`p-4 rounded-2xl text-center ${votesMatch ? 'bg-green-100' : 'bg-yellow-100'}`}>
-                <span className="text-3xl block mb-2">{votesMatch ? '🎉' : '🤔'}</span>
-                <p className="font-medium mb-1">{votesMatch ? '¡Pensáis igual!' : 'Opiniones diferentes'}</p>
+              <div className={`p-4 rounded-2xl text-center animate-fade-up ${votesMatch ? 'bg-green-100' : 'bg-yellow-100 animate-shake'}`}>
+                <span className="text-3xl block mb-2">{votesMatch ? '❤️' : oopsData?.emoji || '🙈'}</span>
+                <p className="font-medium mb-1">{votesMatch ? '¡Pensáis igual!' : oopsData?.message || 'Opiniones diferentes'}</p>
                 <p className="text-sm opacity-80">{resultText}</p>
               </div>
               <Button onClick={handleContinue}>Continuar →</Button>
@@ -352,23 +402,7 @@ export function AdventureGame({
 
           {/* TREASURE: Final de aventura */}
           {currentEvent.type === 'treasure' && (
-            <div className="space-y-4">
-              <div
-                className="rounded-2xl p-6 text-center"
-                style={{
-                  background: `linear-gradient(135deg, ${adventure.palette.accent}40, ${adventure.palette.primary}40)`
-                }}
-              >
-                <span className="text-5xl block mb-2">🏆</span>
-                <p className="text-lg font-bold" style={{ color: adventure.palette.primary }}>
-                  ¡Aventura completada!
-                </p>
-                <p className="text-sm opacity-70 mt-1">
-                  Habéis vivido una experiencia única juntos
-                </p>
-              </div>
-              <Button onClick={onFinish}>Terminar</Button>
-            </div>
+            <TreasureResult adventure={adventure} onFinish={onFinish} />
           )}
         </div>
       </div>

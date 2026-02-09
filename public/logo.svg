@@ -10,19 +10,17 @@
     </linearGradient>
   </defs>
 
-  <!-- Mitad izquierda (lavanda) - lobulo arriba izquierda, baja al centro -->
-  <path d="M35 32
-    C22 32, 18 48, 28 62
-    C38 76, 58 92, 60 95
-    L60 95
-    C60 70, 50 50, 35 32Z"
+  <!-- Pétalo izquierdo (lavanda) - forma de V/pétalo -->
+  <path d="M60 98
+    C52 78, 18 58, 20 35
+    C21 22, 32 18, 42 22
+    C52 26, 58 38, 60 50Z"
     fill="url(#lavanda)"/>
 
-  <!-- Mitad derecha (rosa) - lobulo arriba derecha, baja al centro -->
-  <path d="M85 32
-    C98 32, 102 48, 92 62
-    C82 76, 62 92, 60 95
-    L60 95
-    C60 70, 70 50, 85 32Z"
+  <!-- Pétalo derecho (rosa) - forma de V/pétalo -->
+  <path d="M60 98
+    C68 78, 102 58, 100 35
+    C99 22, 88 18, 78 22
+    C68 26, 62 38, 60 50Z"
     fill="url(#rosa)"/>
 </svg>

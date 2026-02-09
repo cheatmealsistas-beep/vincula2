@@ -18,7 +18,7 @@ export function Button({
   const baseStyles = `
     w-full py-3.5 px-5 rounded-2xl font-semibold text-base
     transition-all duration-200 ease-out
-    disabled:opacity-80 disabled:cursor-not-allowed disabled:saturate-50
+    disabled:opacity-50 disabled:cursor-not-allowed disabled:grayscale
     active:scale-[0.97]
     min-h-[48px]
   `;
@@ -35,8 +35,8 @@ export function Button({
       hover:bg-white hover:shadow-soft
     `,
     ghost: `
-      bg-transparent text-[var(--color-text)]
-      hover:bg-white/50
+      bg-white/40 text-[var(--color-text)] border border-gray-200
+      hover:bg-white/70 hover:border-gray-300
     `,
   };
 

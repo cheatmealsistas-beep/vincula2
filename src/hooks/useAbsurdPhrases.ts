@@ -36,6 +36,7 @@ export function useAbsurdPhrases(
   const [gameFinished, setGameFinished] = useState(false);
 
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const subscribedRef = useRef(false);
   const stateRef = useRef({ phrases, currentRound, responses });
 
   // Mantener refs actualizados
@@ -70,7 +71,7 @@ export function useAbsurdPhrases(
 
   // Manejar mensajes recibidos
   const handleMessage = useCallback((message: SyncMessage) => {
-    console.log('[AbsurdPhrases] Recibido:', message.type, message.payload);
+    console.log('[AbsurdPhrases] Recibido:', message.type);
 
     switch (message.type) {
       case 'game_state':
@@ -137,6 +138,7 @@ export function useAbsurdPhrases(
       })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
+          subscribedRef.current = true;
           console.log('[AbsurdPhrases] Conectado exitosamente');
         } else if (status === 'CHANNEL_ERROR') {
           console.error('[AbsurdPhrases] Error de conexion');
@@ -144,6 +146,7 @@ export function useAbsurdPhrases(
       });
 
     channelRef.current = channel;
+    subscribedRef.current = false;
 
     return () => {
       console.log('[AbsurdPhrases] Desconectando');
@@ -152,10 +155,22 @@ export function useAbsurdPhrases(
     };
   }, [roomId, myPlayerNumber, handleMessage]);
 
+  const waitForSubscription = useCallback(() => {
+    return new Promise<void>((resolve) => {
+      if (subscribedRef.current) return resolve();
+      const interval = setInterval(() => {
+        if (subscribedRef.current) { clearInterval(interval); resolve(); }
+      }, 100);
+      setTimeout(() => { clearInterval(interval); resolve(); }, 5000);
+    });
+  }, []);
+
   // Iniciar juego
   const startGame = useCallback(async () => {
     if (!roomId || !myPlayerNumber) return;
     setLoading(true);
+
+    await waitForSubscription();
 
     if (myPlayerNumber === 1) {
       const newPhrases = getRandomPhrases(5);
@@ -198,7 +213,7 @@ export function useAbsurdPhrases(
         setLoading(false);
       }, 5000);
     }
-  }, [roomId, myPlayerNumber, send]);
+  }, [roomId, myPlayerNumber, send, waitForSubscription]);
 
   // Enviar respuesta
   const submitAnswer = useCallback((answer: string) => {

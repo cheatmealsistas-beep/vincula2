@@ -59,7 +59,7 @@ export function useGameSync(
       timestamp: Date.now(),
     };
 
-    console.log('[GameSync] Enviando:', message.type, message.payload);
+    console.log('[GameSync] Enviando:', message.type);
 
     channelRef.current.send({
       type: 'broadcast',
@@ -70,7 +70,7 @@ export function useGameSync(
 
   // Manejar mensajes recibidos
   const handleMessage = useCallback((message: SyncMessage) => {
-    console.log('[GameSync] Recibido:', message.type, message.payload);
+    console.log('[GameSync] Recibido:', message.type);
 
     switch (message.type) {
       case 'game_state':

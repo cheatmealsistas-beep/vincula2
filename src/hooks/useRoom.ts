@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, ensureAnonymousSession } from '../lib/supabase';
 import type { Room, Player, Message } from '../lib/supabase';
 
 interface UseRoomReturn {
@@ -42,32 +42,29 @@ export function useRoom(): UseRoomReturn {
     setError(null);
 
     try {
-      console.log('[useRoom] Creando sala:', code, 'tipo:', gameType);
+      await ensureAnonymousSession();
 
-      // Crear sala (sin game_type hasta que el host elija)
+      const { data: roomId, error: rpcError } = await supabase.rpc('create_room_as_player', {
+        p_code: code,
+        p_game_type: gameType || null,
+        p_invite_message: inviteMessage || null,
+      });
+
+      if (rpcError || !roomId) throw rpcError || new Error('No se pudo crear la sala');
+
       const { data: roomData, error: roomError } = await supabase
         .from('rooms')
-        .insert({
-          code,
-          game_type: gameType || null,
-          invite_message: inviteMessage || null,
-        })
         .select()
+        .eq('id', roomId)
         .single();
-
-      console.log('[useRoom] Sala creada:', { roomData, roomError });
 
       if (roomError) throw roomError;
 
-      // Crear jugador 1
       const { data: playerData, error: playerError } = await supabase
         .from('players')
-        .insert({
-          room_id: roomData.id,
-          player_number: 1,
-          is_online: true,
-        })
         .select()
+        .eq('room_id', roomId)
+        .eq('player_number', 1)
         .single();
 
       if (playerError) throw playerError;
@@ -90,66 +87,42 @@ export function useRoom(): UseRoomReturn {
     setError(null);
 
     try {
-      console.log('[useRoom] Intentando unirse a sala:', code.toUpperCase());
+      await ensureAnonymousSession();
 
-      // Buscar sala
-      const { data: roomData, error: roomError } = await supabase
-        .from('rooms')
-        .select()
-        .eq('code', code.toUpperCase())
+      const { data: joinResult, error: rpcError } = await supabase
+        .rpc('join_room_as_player', { p_code: code.toUpperCase() })
         .single();
 
-      console.log('[useRoom] Resultado búsqueda:', { roomData, roomError });
-
-      if (roomError || !roomData) {
-        console.error('[useRoom] joinRoom error:', roomError, 'data:', roomData);
+      if (rpcError || !joinResult) {
         setError('No existe una sala con ese código');
         setLoading(false);
         return false;
       }
 
-      // Ver si ya hay jugadores
-      const { data: players } = await supabase
-        .from('players')
+      const { room_id: roomId, player_number: playerNumber } = joinResult as {
+        room_id: string;
+        player_number: 1 | 2;
+      };
+
+      const { data: roomData, error: roomError } = await supabase
+        .from('rooms')
         .select()
-        .eq('room_id', roomData.id);
+        .eq('id', roomId)
+        .single();
 
-      const existingPlayers = players || [];
-      console.log('[useRoom] Jugadores existentes:', existingPlayers);
+      if (roomError) throw roomError;
 
-      // Solo mantener al jugador 1 (host) si existe
-      // Cualquier jugador 2 antiguo se elimina para permitir nuevo invitado
-      const player1 = existingPlayers.find(p => p.player_number === 1);
-      const player2s = existingPlayers.filter(p => p.player_number === 2);
-
-      // Eliminar jugadores 2 antiguos (para permitir reconexión)
-      if (player2s.length > 0) {
-        console.log('[useRoom] Limpiando jugadores 2 antiguos:', player2s.map(p => p.id));
-        await supabase
-          .from('players')
-          .delete()
-          .in('id', player2s.map(p => p.id));
-      }
-
-      // El invitado siempre es jugador 2 si hay host
-      const playerNumber = player1 ? 2 : 1;
-      console.log('[useRoom] Asignando player_number:', playerNumber);
-
-      // Crear jugador
       const { data: playerData, error: playerError } = await supabase
         .from('players')
-        .insert({
-          room_id: roomData.id,
-          player_number: playerNumber,
-          is_online: true,
-        })
         .select()
+        .eq('room_id', roomId)
+        .eq('player_number', playerNumber)
         .single();
 
       if (playerError) throw playerError;
 
       setRoom(roomData);
-      setMyPlayerNumber(playerNumber as 1 | 2);
+      setMyPlayerNumber(playerNumber);
       setMyPlayerId(playerData.id);
       setLoading(false);
       return true;
@@ -274,7 +247,6 @@ export function useRoom(): UseRoomReturn {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${room.id}` },
         (payload: any) => {
-          console.log('[useRoom] Cambio en sala recibido:', payload);
           if (payload.new) {
             setRoom(payload.new as Room);
           }

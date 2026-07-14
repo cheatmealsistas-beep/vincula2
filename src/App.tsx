@@ -78,11 +78,12 @@ type Screen =
   | 'pause'
   | 'end';
 
-// Genera un código memorable tipo "AMOR42"
+// Genera un código memorable tipo "AMOR4217"
 function generateCode(): string {
   const words = ['AMOR', 'BESO', 'ALMA', 'MIEL', 'NIDO', 'LAZO', 'MIMO', 'LUNA'];
   const word = words[Math.floor(Math.random() * words.length)];
-  const num = Math.floor(Math.random() * 90) + 10;
+  // 4 dígitos (1000-9999) en vez de 2: sube el espacio de códigos de 720 a ~72.000
+  const num = Math.floor(Math.random() * 9000) + 1000;
   return `${word}${num}`;
 }
 

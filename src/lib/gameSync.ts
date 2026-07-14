@@ -98,7 +98,7 @@ class GameSyncManager {
 
   // Manejar mensaje recibido
   private handleMessage(message: SyncMessage) {
-    console.log('[GameSync] Mensaje recibido:', message.type, message.payload);
+    console.log('[GameSync] Mensaje recibido:', message.type);
 
     switch (message.type) {
       case 'game_state':

@@ -79,7 +79,7 @@ export function useSillyChallenges(
 
   // Manejar mensajes recibidos
   const handleMessage = useCallback((message: SyncMessage) => {
-    console.log('[SillyChallenges] Recibido:', message.type, message.payload);
+    console.log('[SillyChallenges] Recibido:', message.type);
 
     switch (message.type) {
       case 'game_state':

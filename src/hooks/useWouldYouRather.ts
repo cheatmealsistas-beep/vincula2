@@ -40,6 +40,7 @@ export function useWouldYouRather(
   const [gameFinished, setGameFinished] = useState(false);
 
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const subscribedRef = useRef(false);
   const stateRef = useRef({ cards, currentRound, responses });
 
   useEffect(() => {
@@ -71,7 +72,7 @@ export function useWouldYouRather(
   }, [myPlayerNumber]);
 
   const handleMessage = useCallback((message: SyncMessage) => {
-    console.log('[WouldYouRather] Recibido:', message.type, message.payload);
+    console.log('[WouldYouRather] Recibido:', message.type);
 
     switch (message.type) {
       case 'game_state':
@@ -137,6 +138,7 @@ export function useWouldYouRather(
       })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
+          subscribedRef.current = true;
           console.log('[WouldYouRather] Conectado exitosamente');
         } else if (status === 'CHANNEL_ERROR') {
           console.error('[WouldYouRather] Error de conexion');
@@ -144,6 +146,7 @@ export function useWouldYouRather(
       });
 
     channelRef.current = channel;
+    subscribedRef.current = false;
 
     return () => {
       console.log('[WouldYouRather] Desconectando');
@@ -152,9 +155,21 @@ export function useWouldYouRather(
     };
   }, [roomId, myPlayerNumber, handleMessage]);
 
+  const waitForSubscription = useCallback(() => {
+    return new Promise<void>((resolve) => {
+      if (subscribedRef.current) return resolve();
+      const interval = setInterval(() => {
+        if (subscribedRef.current) { clearInterval(interval); resolve(); }
+      }, 100);
+      setTimeout(() => { clearInterval(interval); resolve(); }, 5000);
+    });
+  }, []);
+
   const startGame = useCallback(async () => {
     if (!roomId || !myPlayerNumber) return;
     setLoading(true);
+
+    await waitForSubscription();
 
     if (myPlayerNumber === 1) {
       const newCards = getRandomWouldYouRatherCards(5);
@@ -197,7 +212,7 @@ export function useWouldYouRather(
         setLoading(false);
       }, 5000);
     }
-  }, [roomId, myPlayerNumber, send]);
+  }, [roomId, myPlayerNumber, send, waitForSubscription]);
 
   const submitChoice = useCallback((choice: 'A' | 'B') => {
     if (!myPlayerNumber || cards.length === 0) return;

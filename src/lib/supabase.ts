@@ -16,6 +16,17 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
+// Las políticas RLS requieren un usuario autenticado (aunque sea anónimo) para poder
+// asociar cada jugador a su propia fila y aplicar los checks de pertenencia a la sala.
+export async function ensureAnonymousSession() {
+  const { data } = await supabase.auth.getSession();
+  if (data.session) return data.session;
+
+  const { data: signInData, error } = await supabase.auth.signInAnonymously();
+  if (error) throw error;
+  return signInData.session;
+}
+
 // Tipos para las tablas
 export interface Room {
   id: string;
@@ -34,6 +45,7 @@ export interface Player {
   id: string;
   room_id: string;
   player_number: 1 | 2;
+  user_id: string;
   last_seen: string;
   is_online: boolean;
   created_at: string;
